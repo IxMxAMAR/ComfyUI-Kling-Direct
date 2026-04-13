@@ -350,8 +350,8 @@ class KlingClient:
         data = {"video_url": video_url}
         return self._create_task("/v1/audio/video-to-audio", data)
 
-    def tts(self, text: str, voice_id: str, voice_speed: float) -> str:
-        data = {"text": text, "voice_id": voice_id, "voice_speed": voice_speed}
+    def tts(self, text: str, voice_id: str, voice_speed: float, voice_language: str = "en") -> str:
+        data = {"text": text, "voice_id": voice_id, "voice_speed": voice_speed, "voice_language": voice_language}
         return self._create_task("/v1/audio/tts", data)
 
     def voice_clone(self, audio_url: Optional[str] = None, audio_b64: Optional[str] = None) -> str:

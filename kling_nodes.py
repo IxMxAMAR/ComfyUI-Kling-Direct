@@ -239,6 +239,7 @@ def audio_to_base64_string(audio: Dict[str, Any], target_sr: int = TARGET_SAMPLE
 
 def download_to_output(url: str, ext: str = "mp4") -> tuple:
     output_dir = folder_paths.get_output_directory()
+    os.makedirs(output_dir, exist_ok=True)
 
     clean_path = urlparse(url).path
     detected_ext = os.path.splitext(clean_path)[1]
@@ -246,6 +247,10 @@ def download_to_output(url: str, ext: str = "mp4") -> tuple:
 
     filename = f"kling_{uuid.uuid4().hex}.{filename_ext}"
     file_path = os.path.join(output_dir, filename)
+
+    # Print URL first so it's recoverable if download fails
+    print(f"[KLING] Download URL: {url}")
+
     response = requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT)
     response.raise_for_status()
     with open(file_path, "wb") as f:
@@ -338,42 +343,75 @@ def _detect_mime(filename: str) -> str:
 
 
 def upload_to_catbox(file_content: bytes, filename: str, mime_type: str) -> str:
-    """Uploads to catbox.moe (Public, no login)."""
-    try:
-        url = "https://catbox.moe/user/api.php"
-        data = {"reqtype": "fileupload"}
-        files = {"fileToUpload": (filename, file_content, mime_type)}
-        response = requests.post(url, data=data, files=files, timeout=120)
-        response.raise_for_status()
-        url_res = response.text.strip()
-        if not url_res.startswith("http"):
-            raise Exception(f"Catbox error: {url_res}")
-        print(f"[KLING] Catbox upload complete: {url_res}")
-        return url_res
-    except Exception as e:
-        logger.error(f"Catbox Upload Failed: {e}")
-        raise Exception(f"Catbox Upload Failed: {e}")
+    """Uploads to catbox.moe with retry."""
+    import time as _time
+    url = "https://catbox.moe/user/api.php"
+    for attempt in range(3):
+        try:
+            data = {"reqtype": "fileupload"}
+            files = {"fileToUpload": (filename, file_content, mime_type)}
+            response = requests.post(url, data=data, files=files, timeout=120)
+            response.raise_for_status()
+            url_res = response.text.strip()
+            if not url_res.startswith("http"):
+                raise Exception(f"Catbox error: {url_res}")
+            print(f"[KLING] Catbox upload complete: {url_res}")
+            return url_res
+        except Exception as e:
+            if attempt < 2:
+                wait = (attempt + 1) * 3
+                print(f"[KLING] Catbox upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
+                _time.sleep(wait)
+            else:
+                logger.error(f"Catbox Upload Failed after 3 attempts: {e}")
+                raise Exception(f"Catbox Upload Failed: {e}")
 
 def upload_to_tmpfiles(file_content: bytes, filename: str, mime_type: str) -> str:
-    """Uploads to tmpfiles.org (Public, short-lived)."""
-    try:
-        url = "https://tmpfiles.org/api/v1/upload"
-        files = {"file": (filename, file_content, mime_type)}
-        response = requests.post(url, files=files, timeout=120)
-        response.raise_for_status()
-        data = response.json()
-        if "data" in data and "url" in data["data"]:
-            orig_url = data["data"]["url"]
-            if "tmpfiles.org/" in orig_url and "/dl/" not in orig_url:
-                dl_url = orig_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+    """Uploads to tmpfiles.org with retry."""
+    import time as _time
+    url = "https://tmpfiles.org/api/v1/upload"
+    for attempt in range(3):
+        try:
+            files = {"file": (filename, file_content, mime_type)}
+            response = requests.post(url, files=files, timeout=120)
+            response.raise_for_status()
+            data = response.json()
+            if "data" in data and "url" in data["data"]:
+                orig_url = data["data"]["url"]
+                if "tmpfiles.org/" in orig_url and "/dl/" not in orig_url:
+                    dl_url = orig_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+                else:
+                    dl_url = orig_url
+                print(f"[KLING] Tmpfiles upload complete: {dl_url}")
+                return dl_url
+            raise Exception(f"Tmpfiles invalid response: {data}")
+        except Exception as e:
+            if attempt < 2:
+                wait = (attempt + 1) * 3
+                print(f"[KLING] Tmpfiles upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
+                _time.sleep(wait)
             else:
-                dl_url = orig_url
-            print(f"[KLING] Tmpfiles upload complete: {dl_url}")
-            return dl_url
-        raise Exception(f"Tmpfiles invalid response: {data}")
-    except Exception as e:
-        logger.error(f"Tmpfiles Upload Failed: {e}")
-        raise Exception(f"Tmpfiles Upload Failed: {e}")
+                logger.error(f"Tmpfiles Upload Failed after 3 attempts: {e}")
+                raise Exception(f"Tmpfiles Upload Failed: {e}")
+
+
+def upload_to_cloud(file_content: bytes, filename: str, mime_type: str, provider: str = "catbox") -> str:
+    """Upload with automatic fallback — tries the preferred provider first, falls back to the other."""
+    try:
+        if provider == "catbox":
+            return upload_to_catbox(file_content, filename, mime_type)
+        else:
+            return upload_to_tmpfiles(file_content, filename, mime_type)
+    except Exception as primary_err:
+        fallback = "tmpfiles" if provider == "catbox" else "catbox"
+        print(f"[KLING] {provider} failed, trying {fallback} as fallback...")
+        try:
+            if fallback == "catbox":
+                return upload_to_catbox(file_content, filename, mime_type)
+            else:
+                return upload_to_tmpfiles(file_content, filename, mime_type)
+        except Exception as fallback_err:
+            raise Exception(f"Both upload providers failed. {provider}: {primary_err} | {fallback}: {fallback_err}")
 
 # ============================================================
 # Node Definitions
@@ -599,11 +637,8 @@ class KlingDirect_CloudUploader(AlwaysExecuteMixin):
         else:
             raise ValueError("Kling Cloud Uploader requires either audio, image, or valid file_path.")
 
-        print(f"[KLING] Uploading to {provider}...")
-        if provider == "catbox":
-            return (upload_to_catbox(file_content, filename, mime_type),)
-        else:
-            return (upload_to_tmpfiles(file_content, filename, mime_type),)
+        print(f"[KLING] Uploading to {provider} (with fallback)...")
+        return (upload_to_cloud(file_content, filename, mime_type, provider),)
 
 
 # ============================================================
@@ -1045,7 +1080,7 @@ class KlingDirect_TTS(AlwaysExecuteMixin):
 
     def generate(self, auth, text, voice_id):
         client = _make_client(auth)
-        task_id = client.tts(text, voice_id, 1.0)
+        task_id = client.tts(text, voice_id, 1.0, "en")
         res = client.poll_task("/v1/audio/tts", task_id)
         # K1: Fixed -- was calling _extract_video_url, now calls _extract_audio_url
         url = _extract_audio_url(res)
@@ -1169,16 +1204,17 @@ class KlingDirect_TTSAdvanced(AlwaysExecuteMixin):
             "auth": ("KLING_AUTH",),
             "text": ("STRING", {"default": "", "multiline": True, "tooltip": "Text to convert to speech."}),
             "voice_id": ("STRING", {"default": "girlfriend_4_speech02", "tooltip": "Voice ID (use Voice Selector or Voice Clone)."}),
-            "voice_speed": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1, "tooltip": "Speech speed multiplier (0.5 = slow, 2.0 = fast)."})
+            "voice_speed": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1, "tooltip": "Speech speed multiplier (0.5 = slow, 2.0 = fast)."}),
+            "voice_language": ("STRING", {"default": "en", "tooltip": "Voice language code (en, zh, etc.)."})
         }}
     RETURN_TYPES = ("AUDIO", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("audio", "audio_file", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Audio"
 
-    def generate(self, auth, text, voice_id, voice_speed):
+    def generate(self, auth, text, voice_id, voice_speed, voice_language="en"):
         client = _make_client(auth)
-        task_id = client.tts(text, voice_id, voice_speed)
+        task_id = client.tts(text, voice_id, voice_speed, voice_language)
         res = client.poll_task("/v1/audio/tts", task_id)
         # K1: Fixed -- was calling _extract_video_url, now calls _extract_audio_url
         url = _extract_audio_url(res)
