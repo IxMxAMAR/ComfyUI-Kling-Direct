@@ -1,7 +1,7 @@
-"""Shared utilities for ComfyUI-Kling-Direct.
+"""Shared utilities for ComfyUI-AI-Suite.
 
-Re-exports everything so modules can do:
-    from .shared import tensor_to_base64, AlwaysExecuteMixin, api_request_with_retry
+Re-exports everything so services can do:
+    from ...shared import tensor_to_base64, AlwaysExecuteMixin, api_request_with_retry
 """
 
 from .errors import (
@@ -31,6 +31,7 @@ from .conversions import (
     pil_to_tensor,
     tensor_to_base64,
     tensor_to_jpeg_bytes,
+    mask_to_jpeg_bytes,
     bytes_to_tensor,
     audio_to_comfy,
     comfy_to_audio_bytes,
@@ -56,6 +57,7 @@ __all__ = [
     "pil_to_tensor",
     "tensor_to_base64",
     "tensor_to_jpeg_bytes",
+    "mask_to_jpeg_bytes",
     "bytes_to_tensor",
     "audio_to_comfy",
     "comfy_to_audio_bytes",

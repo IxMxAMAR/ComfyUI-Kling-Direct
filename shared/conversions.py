@@ -75,6 +75,31 @@ def tensor_to_jpeg_bytes(tensor: torch.Tensor, quality: int = 95) -> bytes:
     return buf.getvalue()
 
 
+def mask_to_jpeg_bytes(mask: torch.Tensor, quality: int = 95) -> bytes:
+    """Convert a ComfyUI MASK tensor to a B/W JPEG (white = mask, black = keep).
+
+    ComfyUI MASK is [B,H,W] float32 in [0,1]. Converts to a 3-channel RGB image
+    where mask values are replicated across RGB (white = mask region, black = rest).
+
+    Args:
+        mask: Mask tensor of shape [B,H,W] or [H,W] with values in [0,1]
+        quality: JPEG quality (1-100)
+
+    Returns:
+        JPEG-encoded bytes of a black-and-white image
+    """
+    if mask.dim() == 3:
+        mask = mask[0]  # Take first from batch
+    # Clamp and convert to uint8 (0=black, 255=white)
+    arr = (mask.clamp(0, 1) * 255).byte().cpu().numpy()
+    # Expand to 3 channels for JPEG (JPEG can't do single-channel reliably)
+    rgb = np.stack([arr, arr, arr], axis=-1)
+    img = Image.fromarray(rgb, mode="RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=quality)
+    return buf.getvalue()
+
+
 def bytes_to_tensor(data: bytes) -> torch.Tensor:
     """Convert image bytes (any PIL-supported format) to a ComfyUI tensor [1,H,W,C].
 
