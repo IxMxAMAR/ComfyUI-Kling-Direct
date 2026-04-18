@@ -31,21 +31,46 @@ def get_client(access_key: str, secret_key: str, debug: bool = False) -> "KlingC
 
 # --- Kling Error Code Mapping ---
 KLING_ERROR_MAP = {
-    401: "Unauthorized: Invalid AccessKey or SecretKey. Please check your Kling AI Authentication node.",
+    # HTTP-level
+    401: "Unauthorized: Invalid AccessKey or SecretKey. Double-check your Kling AI Authentication node.",
     403: "Forbidden: You may have run out of credits or don't have permission for this model.",
-    429: "Too Many Requests: Kling API rate limit hit or account issue. Try slowing down or check your balance.",
-    1000: "Invalid Parameter: One of your inputs (prompt length, image size) is invalid.",
-    1101: "Invalid Image: The provided image is too large or has an unsupported aspect ratio.",
-    1102: "Account Balance Concern: Often means 'Account balance not enough'. Check your Kling credits.",
-    1107: "Invalid Audio: The provided audio file is problematic.",
-    1200: "Server Busy: Kling's internal system is overloaded. Try again in 60 seconds.",
-    1201: "Internal Error: Kling server had a hiccup. Your task might still be in the queue.",
+    429: "Too Many Requests: Kling API rate limit hit. Slow down or check your balance/tier.",
+    # Auth-level (1000 range)
+    1000: "Invalid Parameter: One of your inputs (prompt length, image size, etc.) is invalid.",
+    1001: "Invalid Token: Authentication token is bad. Regenerate your Kling access/secret keys.",
+    1002: "Invalid API Key: Your AccessKey is not recognized. Check your Kling dev console.",
+    1003: "Authorization Not Active: Your Kling account hasn't been activated for API access yet. "
+          "Go to https://app.klingai.com/global/dev and complete API activation/KYC. "
+          "New accounts may need approval before API calls work.",
+    1004: "Authorization Expired: Your API access has expired. Renew it in your Kling dev console.",
+    # Content/resource-level (1100 range)
+    1101: "Invalid Image: Image is too large, has an unsupported aspect ratio, or failed content check.",
+    1102: "Account Balance Not Enough: Top up your Kling credits at https://app.klingai.com/global/",
+    1103: "Account Frozen: Your Kling account has been suspended. Contact Kling support.",
+    1104: "Resource Exhausted: You've hit a resource cap (concurrent tasks, daily limit, etc.).",
+    1105: "Task Not Found: The task_id you're polling doesn't exist or has expired (72 hours).",
+    1106: "Task Failed: The generation task failed on Kling's side. Try a different prompt/input.",
+    1107: "Invalid Audio: The provided audio file is too long, wrong format, or unreadable.",
+    1108: "Invalid Video: The provided video is too large, too long, or wrong format.",
+    # Server-level (1200 range)
+    1200: "Server Busy: Kling's systems are overloaded. Try again in ~60 seconds.",
+    1201: "Internal Error: Kling server hiccup. Your task may still complete in the queue.",
+    1202: "Gateway Timeout: Kling took too long to respond. Try again shortly.",
+    # Content policy (1300 range)
+    1301: "IP Banned: Your IP has been blocked. Contact Kling if this is unexpected.",
+    1302: "Content Policy Violation: Your prompt or image was flagged by Kling's safety filter.",
+    1303: "Copyright Violation: Detected content is protected/copyrighted.",
 }
 
 # Non-retryable Kling error codes -- retrying won't help
-_PERMANENT_ERROR_CODES = {401, 403, 1000, 1101, 1102, 1107}
+_PERMANENT_ERROR_CODES = {
+    401, 403,
+    1000, 1001, 1002, 1003, 1004,
+    1101, 1102, 1103, 1105, 1107, 1108,
+    1301, 1302, 1303,
+}
 # Retryable Kling error codes -- transient server issues
-_TRANSIENT_ERROR_CODES = {1200, 1201}
+_TRANSIENT_ERROR_CODES = {1104, 1106, 1200, 1201, 1202}
 
 REQUEST_TIMEOUT = 60
 UPLOAD_TIMEOUT = 120
