@@ -362,179 +362,180 @@ def _detect_mime(filename: str) -> str:
     return MIME_MAP.get(ext, "application/octet-stream")
 
 
-def upload_to_catbox(file_content: bytes, filename: str, mime_type: str) -> str:
-    """Uploads to catbox.moe with retry."""
+def _retry_upload(fn, name: str, retries: int, retry_delay_base: int):
+    """Generic retry wrapper for upload functions. Calls fn() up to `retries` times."""
     import time as _time
+    last_err = None
+    for attempt in range(retries):
+        try:
+            return fn()
+        except Exception as e:
+            last_err = e
+            if attempt < retries - 1:
+                wait = (attempt + 1) * retry_delay_base
+                print(f"[KLING] {name} upload failed ({e}), retrying in {wait}s... ({attempt + 1}/{retries})")
+                _time.sleep(wait)
+    raise Exception(f"{name} Upload Failed: {last_err}")
+
+
+def upload_to_catbox(file_content: bytes, filename: str, mime_type: str,
+                     timeout: int = 120, retries: int = 3) -> str:
+    """Uploads to catbox.moe. timeout=seconds per attempt, retries=max attempts."""
     url = "https://catbox.moe/user/api.php"
-    for attempt in range(3):
-        try:
-            data = {"reqtype": "fileupload"}
-            files = {"fileToUpload": (filename, file_content, mime_type)}
-            response = requests.post(url, data=data, files=files, timeout=120)
-            response.raise_for_status()
-            url_res = response.text.strip()
-            if not url_res.startswith("http"):
-                raise Exception(f"Catbox error: {url_res}")
-            print(f"[KLING] Catbox upload complete: {url_res}")
-            return url_res
-        except Exception as e:
-            if attempt < 2:
-                wait = (attempt + 1) * 3
-                print(f"[KLING] Catbox upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
-                _time.sleep(wait)
-            else:
-                logger.error(f"Catbox Upload Failed after 3 attempts: {e}")
-                raise Exception(f"Catbox Upload Failed: {e}")
+    def _do():
+        data = {"reqtype": "fileupload"}
+        files = {"fileToUpload": (filename, file_content, mime_type)}
+        response = requests.post(url, data=data, files=files, timeout=timeout)
+        response.raise_for_status()
+        url_res = response.text.strip()
+        if not url_res.startswith("http"):
+            raise Exception(f"Catbox error: {url_res}")
+        print(f"[KLING] Catbox upload complete: {url_res}")
+        return url_res
+    return _retry_upload(_do, "Catbox", retries, 3)
 
-def upload_to_tmpfiles(file_content: bytes, filename: str, mime_type: str) -> str:
-    """Uploads to tmpfiles.org with retry."""
-    import time as _time
+
+def upload_to_tmpfiles(file_content: bytes, filename: str, mime_type: str,
+                       timeout: int = 120, retries: int = 3) -> str:
+    """Uploads to tmpfiles.org."""
     url = "https://tmpfiles.org/api/v1/upload"
-    for attempt in range(3):
-        try:
-            files = {"file": (filename, file_content, mime_type)}
-            response = requests.post(url, files=files, timeout=120)
-            response.raise_for_status()
-            data = response.json()
-            if "data" in data and "url" in data["data"]:
-                orig_url = data["data"]["url"]
-                if "tmpfiles.org/" in orig_url and "/dl/" not in orig_url:
-                    dl_url = orig_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-                else:
-                    dl_url = orig_url
-                print(f"[KLING] Tmpfiles upload complete: {dl_url}")
-                return dl_url
-            raise Exception(f"Tmpfiles invalid response: {data}")
-        except Exception as e:
-            if attempt < 2:
-                wait = (attempt + 1) * 3
-                print(f"[KLING] Tmpfiles upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
-                _time.sleep(wait)
+    def _do():
+        files = {"file": (filename, file_content, mime_type)}
+        response = requests.post(url, files=files, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+        if "data" in data and "url" in data["data"]:
+            orig_url = data["data"]["url"]
+            if "tmpfiles.org/" in orig_url and "/dl/" not in orig_url:
+                dl_url = orig_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
             else:
-                logger.error(f"Tmpfiles Upload Failed after 3 attempts: {e}")
-                raise Exception(f"Tmpfiles Upload Failed: {e}")
+                dl_url = orig_url
+            print(f"[KLING] Tmpfiles upload complete: {dl_url}")
+            return dl_url
+        raise Exception(f"Tmpfiles invalid response: {data}")
+    return _retry_upload(_do, "Tmpfiles", retries, 3)
 
 
-def upload_to_litterbox(file_content: bytes, filename: str, mime_type: str, retention: str = "1h") -> str:
-    """Uploads to litterbox.catbox.moe (catbox's temporary bucket, more reliable than tmpfiles).
-    retention: '1h', '12h', '24h', '72h'
-    """
-    import time as _time
+def upload_to_litterbox(file_content: bytes, filename: str, mime_type: str,
+                        retention: str = "1h", timeout: int = 180, retries: int = 3) -> str:
+    """Uploads to litterbox.catbox.moe. retention: '1h', '12h', '24h', '72h'."""
     url = "https://litterbox.catbox.moe/resources/internals/api.php"
-    for attempt in range(3):
-        try:
-            data = {"reqtype": "fileupload", "time": retention}
-            files = {"fileToUpload": (filename, file_content, mime_type)}
-            response = requests.post(url, data=data, files=files, timeout=180)
-            response.raise_for_status()
-            url_res = response.text.strip()
-            if not url_res.startswith("http"):
-                raise Exception(f"Litterbox error: {url_res}")
-            print(f"[KLING] Litterbox upload complete: {url_res}")
-            return url_res
-        except Exception as e:
-            if attempt < 2:
-                wait = (attempt + 1) * 3
-                print(f"[KLING] Litterbox upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
-                _time.sleep(wait)
-            else:
-                raise Exception(f"Litterbox Upload Failed: {e}")
+    def _do():
+        data = {"reqtype": "fileupload", "time": retention}
+        files = {"fileToUpload": (filename, file_content, mime_type)}
+        response = requests.post(url, data=data, files=files, timeout=timeout)
+        response.raise_for_status()
+        url_res = response.text.strip()
+        if not url_res.startswith("http"):
+            raise Exception(f"Litterbox error: {url_res}")
+        print(f"[KLING] Litterbox upload complete: {url_res}")
+        return url_res
+    return _retry_upload(_do, "Litterbox", retries, 3)
 
 
-def upload_to_0x0(file_content: bytes, filename: str, mime_type: str) -> str:
-    """Uploads to 0x0.st (reliable, permanent, no account, 512MB max)."""
-    import time as _time
+def upload_to_0x0(file_content: bytes, filename: str, mime_type: str,
+                  timeout: int = 180, retries: int = 3) -> str:
+    """Uploads to 0x0.st (reliable, permanent, 512MB max)."""
     url = "https://0x0.st"
-    for attempt in range(3):
-        try:
-            files = {"file": (filename, file_content, mime_type)}
-            # 0x0.st requires a User-Agent
-            headers = {"User-Agent": "ComfyUI-API-Toolkit/1.0"}
-            response = requests.post(url, files=files, headers=headers, timeout=180)
-            response.raise_for_status()
-            url_res = response.text.strip()
-            if not url_res.startswith("http"):
-                raise Exception(f"0x0.st error: {url_res}")
-            print(f"[KLING] 0x0.st upload complete: {url_res}")
-            return url_res
-        except Exception as e:
-            if attempt < 2:
-                wait = (attempt + 1) * 3
-                print(f"[KLING] 0x0.st upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
-                _time.sleep(wait)
-            else:
-                raise Exception(f"0x0.st Upload Failed: {e}")
+    def _do():
+        files = {"file": (filename, file_content, mime_type)}
+        headers = {"User-Agent": "ComfyUI-API-Toolkit/1.0"}
+        response = requests.post(url, files=files, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        url_res = response.text.strip()
+        if not url_res.startswith("http"):
+            raise Exception(f"0x0.st error: {url_res}")
+        print(f"[KLING] 0x0.st upload complete: {url_res}")
+        return url_res
+    return _retry_upload(_do, "0x0.st", retries, 3)
 
 
-def upload_to_uguu(file_content: bytes, filename: str, mime_type: str) -> str:
-    """Uploads to uguu.se (simple, reliable, 24h retention, 128MB max)."""
-    import time as _time
+def upload_to_uguu(file_content: bytes, filename: str, mime_type: str,
+                   timeout: int = 180, retries: int = 3) -> str:
+    """Uploads to uguu.se (simple, 24h retention, 128MB max)."""
     url = "https://uguu.se/upload"
-    for attempt in range(3):
-        try:
-            files = {"files[]": (filename, file_content, mime_type)}
-            response = requests.post(url, files=files, timeout=180)
-            response.raise_for_status()
-            data = response.json()
-            files_list = data.get("files", [])
-            if files_list and files_list[0].get("url"):
-                url_res = files_list[0]["url"]
-                print(f"[KLING] Uguu upload complete: {url_res}")
-                return url_res
-            raise Exception(f"Uguu invalid response: {data}")
-        except Exception as e:
-            if attempt < 2:
-                wait = (attempt + 1) * 3
-                print(f"[KLING] Uguu upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
-                _time.sleep(wait)
-            else:
-                raise Exception(f"Uguu Upload Failed: {e}")
+    def _do():
+        files = {"files[]": (filename, file_content, mime_type)}
+        response = requests.post(url, files=files, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+        files_list = data.get("files", [])
+        if files_list and files_list[0].get("url"):
+            url_res = files_list[0]["url"]
+            print(f"[KLING] Uguu upload complete: {url_res}")
+            return url_res
+        raise Exception(f"Uguu invalid response: {data}")
+    return _retry_upload(_do, "Uguu", retries, 3)
 
 
-# Provider registry -- order matters for the "auto" fallback chain
-_UPLOAD_PROVIDERS = {
-    "catbox": upload_to_catbox,
-    "litterbox_1h": lambda c, f, m: upload_to_litterbox(c, f, m, "1h"),
-    "litterbox_24h": lambda c, f, m: upload_to_litterbox(c, f, m, "24h"),
-    "litterbox_72h": lambda c, f, m: upload_to_litterbox(c, f, m, "72h"),
-    "0x0": upload_to_0x0,
-    "uguu": upload_to_uguu,
-    "tmpfiles": upload_to_tmpfiles,
-}
+# Provider registry -- each entry is a callable taking (content, filename, mime, timeout, retries)
+def _call_provider(name: str, content: bytes, filename: str, mime: str, timeout: int, retries: int) -> str:
+    """Call the named provider with tuned timeout/retry params."""
+    if name == "catbox":
+        return upload_to_catbox(content, filename, mime, timeout=timeout, retries=retries)
+    if name == "litterbox_1h":
+        return upload_to_litterbox(content, filename, mime, retention="1h", timeout=timeout, retries=retries)
+    if name == "litterbox_24h":
+        return upload_to_litterbox(content, filename, mime, retention="24h", timeout=timeout, retries=retries)
+    if name == "litterbox_72h":
+        return upload_to_litterbox(content, filename, mime, retention="72h", timeout=timeout, retries=retries)
+    if name == "0x0":
+        return upload_to_0x0(content, filename, mime, timeout=timeout, retries=retries)
+    if name == "uguu":
+        return upload_to_uguu(content, filename, mime, timeout=timeout, retries=retries)
+    if name == "tmpfiles":
+        return upload_to_tmpfiles(content, filename, mime, timeout=timeout, retries=retries)
+    raise ValueError(f"Unknown provider: {name}")
+
+
+_PROVIDER_NAMES = ["catbox", "litterbox_1h", "litterbox_24h", "litterbox_72h", "0x0", "uguu", "tmpfiles"]
 
 # Fallback chain for "auto" mode -- most reliable first
 _AUTO_FALLBACK_ORDER = ["catbox", "litterbox_1h", "0x0", "uguu", "tmpfiles"]
+
+# Fast-fail config for auto mode: short timeout per attempt, minimal retries
+_AUTO_TIMEOUT = 20     # seconds — fail fast if host is slow/down
+_AUTO_RETRIES = 1      # one shot per provider, then move on
+
+# Full retry config for single-provider mode
+_FULL_TIMEOUT = 120
+_FULL_RETRIES = 3
 
 
 def upload_to_cloud(file_content: bytes, filename: str, mime_type: str, provider: str = "catbox") -> str:
     """Upload to cloud with automatic fallback.
 
-    provider: one of the keys in _UPLOAD_PROVIDERS, or 'auto' to try the fallback chain.
+    - 'auto': tries each provider with 20s timeout and 1 attempt, moves on fast
+    - single provider: uses 120s timeout and 3 retries (full reliability mode)
     """
     if provider == "auto":
         last_err = None
         for p in _AUTO_FALLBACK_ORDER:
             try:
-                return _UPLOAD_PROVIDERS[p](file_content, filename, mime_type)
+                print(f"[KLING] Trying {p} (20s timeout, 1 attempt)...")
+                return _call_provider(p, file_content, filename, mime_type,
+                                      timeout=_AUTO_TIMEOUT, retries=_AUTO_RETRIES)
             except Exception as e:
                 last_err = f"{p}: {e}"
-                print(f"[KLING] {p} failed, trying next...")
+                print(f"[KLING] {p} failed, next...")
         raise Exception(f"All cloud providers failed. Last error: {last_err}")
 
-    # Single provider with fallback to the rest if it fails
-    if provider not in _UPLOAD_PROVIDERS:
-        raise ValueError(f"Unknown provider: {provider}. Options: {list(_UPLOAD_PROVIDERS.keys())}")
+    # Single provider -- use full retry config, and fall back to others with fast-fail if needed
+    if provider not in _PROVIDER_NAMES:
+        raise ValueError(f"Unknown provider: {provider}. Options: {_PROVIDER_NAMES}")
 
     try:
-        return _UPLOAD_PROVIDERS[provider](file_content, filename, mime_type)
+        return _call_provider(provider, file_content, filename, mime_type,
+                              timeout=_FULL_TIMEOUT, retries=_FULL_RETRIES)
     except Exception as primary_err:
-        # Try the other providers as fallback
+        print(f"[KLING] {provider} failed after full retries, falling back to others (fast-fail)...")
         for fallback in _AUTO_FALLBACK_ORDER:
             if fallback == provider:
                 continue
             try:
-                print(f"[KLING] {provider} failed, trying {fallback}...")
-                return _UPLOAD_PROVIDERS[fallback](file_content, filename, mime_type)
+                print(f"[KLING] Trying {fallback} (fast-fail)...")
+                return _call_provider(fallback, file_content, filename, mime_type,
+                                      timeout=_AUTO_TIMEOUT, retries=_AUTO_RETRIES)
             except Exception:
                 continue
         raise Exception(f"All cloud providers failed. Initial error: {primary_err}")
