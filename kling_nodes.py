@@ -1,6 +1,6 @@
-"""Kling AI nodes for ComfyUI-Kling-Direct.
+"""Kling AI nodes for ComfyUI-AI-Suite.
 
-Full-featured Kling AI integration for ComfyUI.
+Ported from ComfyUI-Kling-Direct with bug fixes, new features, and UI improvements.
 """
 
 import json
@@ -26,8 +26,28 @@ except ImportError:
     folder_paths = None
 
 from .kling_client import KlingClient, get_client
-from .shared.auth import DualKeyAPIKeyNode
-from .shared.node_utils import AlwaysExecuteMixin
+
+try:
+    from .shared.auth import DualKeyAPIKeyNode
+    from .shared.node_utils import AlwaysExecuteMixin
+except ImportError:
+    # Fallback for standalone testing
+    try:
+        from shared.auth import DualKeyAPIKeyNode
+        from shared.node_utils import AlwaysExecuteMixin
+    except ImportError:
+        class DualKeyAPIKeyNode:
+            ENV_VAR_ACCESS = ""
+            ENV_VAR_SECRET = ""
+            SERVICE_NAME = "API"
+            RETURN_TYPES = ("STRING", "STRING")
+            RETURN_NAMES = ("access_key", "secret_key")
+            FUNCTION = "provide_keys"
+            CATEGORY = "API Toolkit/Auth"
+        class AlwaysExecuteMixin:
+            @classmethod
+            def IS_CHANGED(cls, **kwargs):
+                return float("nan")
 
 logger = logging.getLogger(__name__)
 
@@ -395,23 +415,171 @@ def upload_to_tmpfiles(file_content: bytes, filename: str, mime_type: str) -> st
                 raise Exception(f"Tmpfiles Upload Failed: {e}")
 
 
-def upload_to_cloud(file_content: bytes, filename: str, mime_type: str, provider: str = "catbox") -> str:
-    """Upload with automatic fallback — tries the preferred provider first, falls back to the other."""
-    try:
-        if provider == "catbox":
-            return upload_to_catbox(file_content, filename, mime_type)
-        else:
-            return upload_to_tmpfiles(file_content, filename, mime_type)
-    except Exception as primary_err:
-        fallback = "tmpfiles" if provider == "catbox" else "catbox"
-        print(f"[KLING] {provider} failed, trying {fallback} as fallback...")
+def upload_to_litterbox(file_content: bytes, filename: str, mime_type: str, retention: str = "1h") -> str:
+    """Uploads to litterbox.catbox.moe (catbox's temporary bucket, more reliable than tmpfiles).
+    retention: '1h', '12h', '24h', '72h'
+    """
+    import time as _time
+    url = "https://litterbox.catbox.moe/resources/internals/api.php"
+    for attempt in range(3):
         try:
-            if fallback == "catbox":
-                return upload_to_catbox(file_content, filename, mime_type)
+            data = {"reqtype": "fileupload", "time": retention}
+            files = {"fileToUpload": (filename, file_content, mime_type)}
+            response = requests.post(url, data=data, files=files, timeout=180)
+            response.raise_for_status()
+            url_res = response.text.strip()
+            if not url_res.startswith("http"):
+                raise Exception(f"Litterbox error: {url_res}")
+            print(f"[KLING] Litterbox upload complete: {url_res}")
+            return url_res
+        except Exception as e:
+            if attempt < 2:
+                wait = (attempt + 1) * 3
+                print(f"[KLING] Litterbox upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
+                _time.sleep(wait)
             else:
-                return upload_to_tmpfiles(file_content, filename, mime_type)
-        except Exception as fallback_err:
-            raise Exception(f"Both upload providers failed. {provider}: {primary_err} | {fallback}: {fallback_err}")
+                raise Exception(f"Litterbox Upload Failed: {e}")
+
+
+def upload_to_0x0(file_content: bytes, filename: str, mime_type: str) -> str:
+    """Uploads to 0x0.st (reliable, permanent, no account, 512MB max)."""
+    import time as _time
+    url = "https://0x0.st"
+    for attempt in range(3):
+        try:
+            files = {"file": (filename, file_content, mime_type)}
+            # 0x0.st requires a User-Agent
+            headers = {"User-Agent": "ComfyUI-API-Toolkit/1.0"}
+            response = requests.post(url, files=files, headers=headers, timeout=180)
+            response.raise_for_status()
+            url_res = response.text.strip()
+            if not url_res.startswith("http"):
+                raise Exception(f"0x0.st error: {url_res}")
+            print(f"[KLING] 0x0.st upload complete: {url_res}")
+            return url_res
+        except Exception as e:
+            if attempt < 2:
+                wait = (attempt + 1) * 3
+                print(f"[KLING] 0x0.st upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
+                _time.sleep(wait)
+            else:
+                raise Exception(f"0x0.st Upload Failed: {e}")
+
+
+def upload_to_uguu(file_content: bytes, filename: str, mime_type: str) -> str:
+    """Uploads to uguu.se (simple, reliable, 24h retention, 128MB max)."""
+    import time as _time
+    url = "https://uguu.se/upload"
+    for attempt in range(3):
+        try:
+            files = {"files[]": (filename, file_content, mime_type)}
+            response = requests.post(url, files=files, timeout=180)
+            response.raise_for_status()
+            data = response.json()
+            files_list = data.get("files", [])
+            if files_list and files_list[0].get("url"):
+                url_res = files_list[0]["url"]
+                print(f"[KLING] Uguu upload complete: {url_res}")
+                return url_res
+            raise Exception(f"Uguu invalid response: {data}")
+        except Exception as e:
+            if attempt < 2:
+                wait = (attempt + 1) * 3
+                print(f"[KLING] Uguu upload failed ({e}), retrying in {wait}s... ({attempt + 1}/3)")
+                _time.sleep(wait)
+            else:
+                raise Exception(f"Uguu Upload Failed: {e}")
+
+
+# Provider registry -- order matters for the "auto" fallback chain
+_UPLOAD_PROVIDERS = {
+    "catbox": upload_to_catbox,
+    "litterbox_1h": lambda c, f, m: upload_to_litterbox(c, f, m, "1h"),
+    "litterbox_24h": lambda c, f, m: upload_to_litterbox(c, f, m, "24h"),
+    "litterbox_72h": lambda c, f, m: upload_to_litterbox(c, f, m, "72h"),
+    "0x0": upload_to_0x0,
+    "uguu": upload_to_uguu,
+    "tmpfiles": upload_to_tmpfiles,
+}
+
+# Fallback chain for "auto" mode -- most reliable first
+_AUTO_FALLBACK_ORDER = ["catbox", "litterbox_1h", "0x0", "uguu", "tmpfiles"]
+
+
+def upload_to_cloud(file_content: bytes, filename: str, mime_type: str, provider: str = "catbox") -> str:
+    """Upload to cloud with automatic fallback.
+
+    provider: one of the keys in _UPLOAD_PROVIDERS, or 'auto' to try the fallback chain.
+    """
+    if provider == "auto":
+        last_err = None
+        for p in _AUTO_FALLBACK_ORDER:
+            try:
+                return _UPLOAD_PROVIDERS[p](file_content, filename, mime_type)
+            except Exception as e:
+                last_err = f"{p}: {e}"
+                print(f"[KLING] {p} failed, trying next...")
+        raise Exception(f"All cloud providers failed. Last error: {last_err}")
+
+    # Single provider with fallback to the rest if it fails
+    if provider not in _UPLOAD_PROVIDERS:
+        raise ValueError(f"Unknown provider: {provider}. Options: {list(_UPLOAD_PROVIDERS.keys())}")
+
+    try:
+        return _UPLOAD_PROVIDERS[provider](file_content, filename, mime_type)
+    except Exception as primary_err:
+        # Try the other providers as fallback
+        for fallback in _AUTO_FALLBACK_ORDER:
+            if fallback == provider:
+                continue
+            try:
+                print(f"[KLING] {provider} failed, trying {fallback}...")
+                return _UPLOAD_PROVIDERS[fallback](file_content, filename, mime_type)
+            except Exception:
+                continue
+        raise Exception(f"All cloud providers failed. Initial error: {primary_err}")
+
+
+def audio_to_wav_bytes_full_quality(audio: Dict[str, Any]) -> bytes:
+    """Convert ComfyUI AUDIO dict to WAV bytes WITHOUT resampling or quality loss.
+
+    Preserves original sample rate and channel count. Uses 16-bit PCM (standard WAV).
+    Unlike audio_to_base64_string() which downsamples to 16kHz mono for Kling TTS input.
+    """
+    if audio is None or "waveform" not in audio:
+        raise ValueError("Invalid audio dict")
+
+    waveform = audio["waveform"]
+    sample_rate = audio.get("sample_rate", 44100)
+
+    # Squeeze batch dimension if present
+    if waveform.dim() == 3:
+        waveform = waveform[0]
+    elif waveform.dim() == 1:
+        waveform = waveform.unsqueeze(0)
+
+    w = waveform.cpu().numpy()
+    # Keep channels as-is (don't force mono)
+    channels = w.shape[0]
+    samples = w.shape[1]
+
+    # Clip to [-1, 1] and convert to int16
+    w_int16 = (np.clip(w, -1.0, 1.0) * INT16_MAX).astype(np.int16)
+
+    # Interleave channels for WAV (WAV wants interleaved, not planar)
+    if channels > 1:
+        interleaved = w_int16.T.flatten()
+    else:
+        interleaved = w_int16[0]
+
+    buffered = io.BytesIO()
+    with wave.open(buffered, "wb") as wav_file:
+        wav_file.setnchannels(channels)
+        wav_file.setsampwidth(2)  # 16-bit
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(interleaved.tobytes())
+
+    return buffered.getvalue()
 
 # ============================================================
 # Node Definitions
@@ -601,29 +769,93 @@ class KlingDirect_CloudUploader(AlwaysExecuteMixin):
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-            "provider": (["catbox", "tmpfiles"], {"default": "catbox", "tooltip": "Cloud hosting provider for temporary file uploads."}),
+            "provider": (
+                ["auto", "catbox", "litterbox_1h", "litterbox_24h", "litterbox_72h", "0x0", "uguu", "tmpfiles"],
+                {"default": "auto",
+                 "tooltip": "Cloud host. 'auto' tries catbox -> litterbox -> 0x0 -> uguu -> tmpfiles (recommended). "
+                            "catbox = permanent. litterbox = 1/24/72h temp. 0x0 = permanent. uguu = 24h. tmpfiles = unreliable."}
+            ),
         }, "optional": {
             "audio": ("AUDIO",),
             "image": ("IMAGE",),
             "file_path": ("STRING", {"default": "", "tooltip": "Path to a local file to upload."}),
+            "preserve_audio_quality": ("BOOLEAN", {
+                "default": True,
+                "tooltip": "If True, uploads audio at original sample rate and channels (no downsampling). "
+                           "If False, downsamples to 16kHz mono (old behavior — only useful if the audio will be fed back into Kling TTS input)."
+            }),
+            "audio_format": (["wav", "mp3", "flac"], {
+                "default": "wav",
+                "tooltip": "Audio encoding format. wav = lossless uncompressed (large). flac = lossless compressed. mp3 = lossy but small."
+            }),
         }}
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("url",)
     FUNCTION = "upload"
     CATEGORY = "Kling AI/Config"
 
-    def upload(self, provider, audio=None, image=None, file_path=""):
+    def upload(self, provider, audio=None, image=None, file_path="",
+               preserve_audio_quality=True, audio_format="wav"):
         file_content = None
         filename = f"upload_{uuid.uuid4().hex[:8]}"
         mime_type = "application/octet-stream"
 
         if audio is not None:
-            audio_b64 = audio_to_base64_string(audio, target_sr=TARGET_SAMPLE_RATE)
-            if not audio_b64:
-                raise ValueError("Failed to process audio for cloud upload.")
-            file_content = base64.b64decode(audio_b64)
-            filename += ".wav"
-            mime_type = "audio/wav"
+            if preserve_audio_quality:
+                # High-quality path: preserve original sample rate, channels, use 16-bit PCM WAV
+                wav_bytes = audio_to_wav_bytes_full_quality(audio)
+
+                if audio_format == "wav":
+                    file_content = wav_bytes
+                    filename += ".wav"
+                    mime_type = "audio/wav"
+                elif audio_format == "flac":
+                    # Convert WAV to FLAC (lossless, smaller)
+                    try:
+                        import soundfile as sf
+                        sr = audio.get("sample_rate", 44100)
+                        wf = audio["waveform"]
+                        if wf.dim() == 3:
+                            wf = wf[0]
+                        arr = wf.cpu().numpy().T  # [samples, channels]
+                        buf = io.BytesIO()
+                        sf.write(buf, arr, sr, format="FLAC")
+                        file_content = buf.getvalue()
+                        filename += ".flac"
+                        mime_type = "audio/flac"
+                    except Exception as e:
+                        logger.warning(f"[KLING] FLAC encoding failed ({e}), falling back to WAV")
+                        file_content = wav_bytes
+                        filename += ".wav"
+                        mime_type = "audio/wav"
+                elif audio_format == "mp3":
+                    # Convert WAV to MP3 (lossy but small)
+                    try:
+                        import soundfile as sf
+                        sr = audio.get("sample_rate", 44100)
+                        wf = audio["waveform"]
+                        if wf.dim() == 3:
+                            wf = wf[0]
+                        arr = wf.cpu().numpy().T
+                        buf = io.BytesIO()
+                        # soundfile supports MP3 writing via libsndfile 1.1+
+                        sf.write(buf, arr, sr, format="MP3", subtype="MPEG_LAYER_III")
+                        file_content = buf.getvalue()
+                        filename += ".mp3"
+                        mime_type = "audio/mpeg"
+                    except Exception as e:
+                        logger.warning(f"[KLING] MP3 encoding failed ({e}), falling back to WAV")
+                        file_content = wav_bytes
+                        filename += ".wav"
+                        mime_type = "audio/wav"
+            else:
+                # Legacy path: downsampled for Kling TTS input
+                audio_b64 = audio_to_base64_string(audio, target_sr=TARGET_SAMPLE_RATE)
+                if not audio_b64:
+                    raise ValueError("Failed to process audio for cloud upload.")
+                file_content = base64.b64decode(audio_b64)
+                filename += ".wav"
+                mime_type = "audio/wav"
         elif image is not None:
             image_b64 = tensor_to_base64_string(image)
             file_content = base64.b64decode(image_b64)
@@ -637,7 +869,8 @@ class KlingDirect_CloudUploader(AlwaysExecuteMixin):
         else:
             raise ValueError("Kling Cloud Uploader requires either audio, image, or valid file_path.")
 
-        print(f"[KLING] Uploading to {provider} (with fallback)...")
+        size_mb = len(file_content) / (1024 * 1024)
+        print(f"[KLING] Uploading {filename} ({size_mb:.2f} MB) via {provider}...")
         return (upload_to_cloud(file_content, filename, mime_type, provider),)
 
 
