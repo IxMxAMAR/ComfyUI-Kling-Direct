@@ -65,9 +65,9 @@ SAFE_FILENAME_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 EMPTY_AUDIO = {"waveform": torch.zeros((1, 1, 1024)), "sample_rate": 44100}
 
-VIDEO_MODELS = ["kling-v3", "kling-v2-1", "kling-v2-5-turbo", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
-VIDEO_MODELS_I2V = ["kling-v3", "kling-v2-1", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
-UPSCALE_MODELS = ["kling-v1", "kling-v2-1", "kling-v3"]
+VIDEO_MODELS = ["kling-v3", "kling-v2-5-turbo", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
+VIDEO_MODELS_I2V = ["kling-v3", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
+UPSCALE_MODELS = ["kling-v1", "kling-v3"]
 
 
 def _extract_video_url(res: dict) -> str:
@@ -1133,7 +1133,7 @@ class KlingDirect_ImageGen(AlwaysExecuteMixin):
             "auth": ("KLING_AUTH",),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text description of the image to generate."}),
             "negative_prompt": ("STRING", {"default": "", "tooltip": "Things to avoid in the generated image."}),
-            "model_name": (["kling-v3", "kling-v2-1"], {"default": "kling-v3", "tooltip": "Kling image model version."}),
+            "model_name": (["kling-v3"], {"default": "kling-v3", "tooltip": "Kling image model version."}),
             "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1", "tooltip": "Output image aspect ratio."}),
             "resolution": (IMAGE_RESOLUTIONS, {"default": "1k", "tooltip": "Output resolution: 1k (~1024px) or 2k (~2048px)."}),
             "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Image fidelity/detail level (0.0 = creative, 1.0 = faithful)."}),

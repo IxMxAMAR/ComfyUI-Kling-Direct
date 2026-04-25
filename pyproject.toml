@@ -1,7 +1,7 @@
 [project]
 name = "kling-direct"
 description = "Full-featured Kling AI integration for ComfyUI - Video, Image, Audio generation"
-version = "2.1.1"
+version = "2.1.2"
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
