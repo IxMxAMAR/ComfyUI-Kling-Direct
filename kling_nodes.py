@@ -202,6 +202,11 @@ def audio_to_base64_string(audio: Dict[str, Any], target_sr: int = TARGET_SAMPLE
         return None
     waveform = audio["waveform"]
     sample_rate = audio.get("sample_rate", 44100)
+    if not sample_rate or sample_rate <= 0:
+        raise ValueError(
+            f"Audio has invalid sample_rate ({sample_rate}). "
+            f"Check the upstream audio node — it may have produced a corrupted AUDIO dict."
+        )
 
     if waveform.dim() == 3:
         waveform = waveform[0]
@@ -285,17 +290,17 @@ def load_video_to_tensor(video_path: str) -> torch.Tensor:
     if not cap.isOpened():
         raise Exception(f"[KLING] Could not open video file: {os.path.basename(video_path)}")
 
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-
-    step = 1
-    if total_frames > MAX_VIDEO_FRAMES:
-        step = max(1, total_frames // MAX_VIDEO_FRAMES)
-        logger.info(f"[KLING] Video has {total_frames} frames -- subsampling every {step}th frame (keeping ~{total_frames // step} frames) to avoid OOM.")
-
-    frames = []
-    frame_idx = 0
     try:
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+
+        step = 1
+        if total_frames > MAX_VIDEO_FRAMES:
+            step = max(1, total_frames // MAX_VIDEO_FRAMES)
+            logger.info(f"[KLING] Video has {total_frames} frames -- subsampling every {step}th frame (keeping ~{total_frames // step} frames) to avoid OOM.")
+
+        frames = []
+        frame_idx = 0
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -304,7 +309,6 @@ def load_video_to_tensor(video_path: str) -> torch.Tensor:
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 frames.append(frame)
             frame_idx += 1
-        cap.release()
 
         if not frames:
             raise Exception(f"[KLING] Video '{os.path.basename(video_path)}' contains no readable frames.")
@@ -315,15 +319,11 @@ def load_video_to_tensor(video_path: str) -> torch.Tensor:
         except (MemoryError, RuntimeError) as mem_err:
             logger.warning(f"[KLING] MEMORY ERROR: Video at {video_path} too large ({len(frames)} frames). Error: {mem_err}")
             logger.warning("[KLING] Returning single-frame placeholder. Full video file is saved in output folder.")
-            first = frames[0] if frames else cv2.cvtColor(cv2.imread(video_path), cv2.COLOR_BGR2RGB)
+            first = frames[0]
             return torch.from_numpy(np.array(first)[None]).float() / 255.0
-
-    except Exception as e:
+    finally:
+        # Always release cv2 capture, even on MemoryError or any other path
         cap.release()
-        if "MEMORY ERROR" in str(e) or isinstance(e, MemoryError):
-            raise
-        logger.error(f"[KLING] Error loading video '{video_path}': {e}")
-        raise Exception(f"[KLING] Failed to load video '{os.path.basename(video_path)}': {e}")
 
 def download_to_tensor(url: str) -> torch.Tensor:
     response = requests.get(url, timeout=DOWNLOAD_TIMEOUT)
@@ -1010,26 +1010,52 @@ class KlingDirect_VideoExtend(AlwaysExecuteMixin):
 
 
 class KlingDirect_LipSync(AlwaysExecuteMixin):
-    """Standard Lip-Sync: sync lips to audio or text."""
+    """Standard Lip-Sync: sync lips to audio (audio2video) or generated TTS (text2video)."""
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
             "auth": ("KLING_AUTH",),
             "video_url": ("STRING", {"default": "", "tooltip": "URL of the source video for lip-sync."}),
-            "mode": (["audio2video", "text2video"], {"default": "audio2video", "tooltip": "audio2video syncs to audio; text2video generates speech."})
+            "mode": (["audio2video", "text2video"], {"default": "audio2video", "tooltip": "audio2video syncs to provided audio; text2video generates speech from text via Kling voice."})
         }, "optional": {
-            "audio": ("AUDIO",),
-            "audio_url": ("STRING", {"default": "", "tooltip": "URL of audio to sync with the video."})
+            "audio": ("AUDIO", {"tooltip": "audio2video mode: ComfyUI audio to sync with the video."}),
+            "audio_url": ("STRING", {"default": "", "tooltip": "audio2video mode: alternative URL of audio."}),
+            "text": ("STRING", {"default": "", "multiline": True, "tooltip": "text2video mode: text to speak. Required if mode=text2video."}),
+            "voice_id": ("STRING", {"default": "girlfriend_4_speech02", "tooltip": "text2video mode: Kling voice ID. Use Voice Selector node."}),
+            "voice_speed": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1, "tooltip": "text2video mode: speech speed."}),
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Video"
 
-    def generate(self, auth, video_url, mode, audio=None, audio_url=None):
+    def generate(self, auth, video_url, mode, audio=None, audio_url=None,
+                 text="", voice_id="girlfriend_4_speech02", voice_speed=1.0):
         client = _make_client(auth)
-        audio_b64 = audio_to_base64_string(audio) if audio is not None else None
-        task_id = client.lip_sync(video_url, audio_url=audio_url, audio_b64=audio_b64, mode=mode)
+
+        # Validate based on mode
+        if mode == "text2video":
+            if not text or not text.strip():
+                raise ValueError("LipSync text2video mode requires a non-empty 'text' input.")
+            audio_b64 = None
+            audio_url_val = None
+            text_val = text.strip()
+        else:  # audio2video
+            if (audio is None) and (not audio_url or not audio_url.strip()):
+                raise ValueError("LipSync audio2video mode requires either 'audio' or 'audio_url'.")
+            audio_b64 = audio_to_base64_string(audio) if audio is not None else None
+            audio_url_val = audio_url if audio_url else None
+            text_val = None
+
+        task_id = client.lip_sync(
+            video_url,
+            audio_url=audio_url_val,
+            audio_b64=audio_b64,
+            text=text_val,
+            voice_id=voice_id if mode == "text2video" else None,
+            voice_speed=voice_speed if mode == "text2video" else 1.0,
+            mode=mode,
+        )
         res = client.poll_task("/v1/videos/lip-sync", task_id)
         url = _extract_video_url(res)
         path, name = download_to_output(url)
@@ -1366,7 +1392,9 @@ class KlingDirect_Upscale(AlwaysExecuteMixin):
             task_id = client.upscale_image(target_id, model_name=model_name)
             res = client.poll_task("/v1/images/upscale", task_id)
             url = _extract_image_url(res)
-            return (download_to_tensor(url), "", dict(EMPTY_AUDIO), url, task_id)
+            # Clone the empty audio tensor so downstream mutation doesn't corrupt the shared singleton
+            empty_audio = {"waveform": EMPTY_AUDIO["waveform"].clone(), "sample_rate": EMPTY_AUDIO["sample_rate"]}
+            return (download_to_tensor(url), "", empty_audio, url, task_id)
         task_id = client.upscale_video(target_id, video_url, model_name=model_name)
         res = client.poll_task("/v1/videos/upscale", task_id)
         url = _extract_video_url(res)
