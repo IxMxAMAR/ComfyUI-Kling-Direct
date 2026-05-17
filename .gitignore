@@ -1,1 +1,13 @@
 node.zip
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+tests/_test_output/
+tests/_test_input/
+.tox/
+.venv/
+*.egg-info/
+build/
+dist/

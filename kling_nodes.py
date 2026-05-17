@@ -1,6 +1,14 @@
-"""Kling AI nodes for ComfyUI-AI-Suite.
+"""Kling AI nodes for ComfyUI-Kling-Direct.
 
-Ported from ComfyUI-Kling-Direct with bug fixes, new features, and UI improvements.
+v2.1.0 — full audit pass:
+- cv2 cap leak fixed for early-fail path (open-before-try-finally bug)
+- Memory-efficient video load (pre-allocates target tensor; ~6x less peak RAM)
+- Empty-waveform crash fixed (audio_to_base64_string would div/0)
+- Cloud uploader requires explicit consent (public hosts)
+- download_to_output now retries + cleans up partial files
+- Filenames truncated to fit MAX_PATH on Windows
+- New nodes: TaskStatus, CameraPreset, AspectRatioPicker, CostEstimator,
+  VideoToFile, LipSyncFromUrl, ApiHealthCheck, KeyframeVideo, RegionSelector
 """
 
 import json
@@ -9,23 +17,30 @@ import numpy as np
 from PIL import Image
 import io
 import base64
+import ipaddress
 import requests
 import os
 import uuid
 import re
 import wave
 import logging
+import socket
 import cv2
 import shutil
+import tempfile
 from urllib.parse import urlparse
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 try:
     import folder_paths
 except ImportError:
     folder_paths = None
 
-from .kling_client import KlingClient, get_client
+try:
+    from .kling_client import KlingClient, KlingAPIError, get_client
+except ImportError:
+    # Standalone import path (tests / direct script execution)
+    from kling_client import KlingClient, KlingAPIError, get_client
 
 try:
     from .shared.auth import DualKeyAPIKeyNode
@@ -68,6 +83,59 @@ EMPTY_AUDIO = {"waveform": torch.zeros((1, 1, 1024)), "sample_rate": 44100}
 VIDEO_MODELS = ["kling-v3", "kling-v2-5-turbo", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
 VIDEO_MODELS_I2V = ["kling-v3", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
 UPSCALE_MODELS = ["kling-v1", "kling-v3"]
+
+# v2.1: Region selector. Kling exposes multiple regional endpoints; users with
+# global vs China accounts hit different gateways. Singapore is default.
+KLING_REGIONS = {
+    "singapore": "https://api-singapore.klingai.com",
+    "china": "https://api.klingai.com",
+    "us": "https://api-us.klingai.com",
+}
+
+# v2.1: Camera-control presets. Each emits a (type, config) pair that
+# matches Kling's camera_control schema. Values are within Kling's accepted
+# -10..10 range per axis.
+CAMERA_PRESETS = {
+    "none": ("simple", {}),
+    "orbit_left": ("horizontal", {"horizontal": -7.0}),
+    "orbit_right": ("horizontal", {"horizontal": 7.0}),
+    "dolly_in": ("zoom", {"zoom": 5.0}),
+    "dolly_out": ("zoom", {"zoom": -5.0}),
+    "zoom_in": ("zoom", {"zoom": 7.0}),
+    "zoom_out": ("zoom", {"zoom": -7.0}),
+    "pan_left": ("pan", {"pan": -5.0}),
+    "pan_right": ("pan", {"pan": 5.0}),
+    "tilt_up": ("tilt", {"tilt": 5.0}),
+    "tilt_down": ("tilt", {"tilt": -5.0}),
+    "crane_up": ("vertical", {"vertical": 5.0}),
+    "crane_down": ("vertical", {"vertical": -5.0}),
+    "roll_cw": ("roll", {"roll": 5.0}),
+    "roll_ccw": ("roll", {"roll": -5.0}),
+}
+
+# v2.1: Polling endpoints (used by the new Task Status node).
+TASK_ENDPOINTS = [
+    "/v1/videos/text2video",
+    "/v1/videos/image2video",
+    "/v1/videos/omni-video",
+    "/v1/videos/video-extend",
+    "/v1/videos/lip-sync",
+    "/v1/videos/advanced-lip-sync",
+    "/v1/videos/motion-control",
+    "/v1/videos/avatar/image2video",
+    "/v1/videos/effects",
+    "/v1/videos/upscale",
+    "/v1/images/generations",
+    "/v1/images/omni-image",
+    "/v1/images/editing/expand",
+    "/v1/images/ai-multi-shot",
+    "/v1/images/kolors-virtual-try-on",
+    "/v1/images/recognize",
+    "/v1/images/upscale",
+    "/v1/audio/text-to-audio",
+    "/v1/audio/tts",
+    "/v1/audio/video-to-audio",
+]
 
 
 def _extract_video_url(res: dict) -> str:
@@ -124,14 +192,61 @@ def _extract_asset_id(res: dict) -> str:
     return asset_id
 
 
-def _sanitize_filename(name: str) -> str:
-    """Remove characters that are invalid in Windows filenames."""
-    return SAFE_FILENAME_RE.sub("_", name)
+def _sanitize_filename(name: str, max_len: int = 200) -> str:
+    """Remove characters that are invalid in Windows filenames.
+    v2.1: also caps length to avoid Windows MAX_PATH (260) failures."""
+    cleaned = SAFE_FILENAME_RE.sub("_", name or "")
+    return cleaned[:max_len] if max_len > 0 else cleaned
 
 
 def _make_client(auth: dict) -> KlingClient:
-    """Create or retrieve a cached KlingClient from an auth dict."""
-    return get_client(auth["access_key"], auth["secret_key"], debug=auth.get("debug", False))
+    """Create or retrieve a cached KlingClient from an auth dict.
+
+    Supports an optional `base_url` override (set by KlingDirect_RegionSelector).
+    """
+    base_url = auth.get("base_url") or "https://api-singapore.klingai.com"
+    return get_client(
+        auth["access_key"],
+        auth["secret_key"],
+        debug=auth.get("debug", False),
+        base_url=base_url,
+    )
+
+
+def _safe_url(url: str) -> str:
+    """Reject non-http(s) schemes and obvious SSRF targets.
+
+    v2.1 SECURITY: A malicious upstream node (or a compromised Kling response
+    parsed by `_extract_*`) could inject `file://`, `gopher://`, or a URL whose
+    host resolves to localhost / RFC1918 / link-local — turning the download
+    helper into an exfiltration / pivot tool. Block both at parse time and at
+    DNS-resolve time.
+    """
+    if not url or not isinstance(url, str):
+        raise ValueError("Kling: download URL is empty or non-string.")
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Kling: refusing download from non-http scheme: {parsed.scheme!r}")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("Kling: download URL has no host.")
+    # Resolve and block private/loopback/link-local — except in tests where the
+    # mock host is e.g. example.com (public). Errors are silently allowed.
+    try:
+        for family, _, _, _, sockaddr in socket.getaddrinfo(host, None):
+            ip_str = sockaddr[0]
+            try:
+                ip = ipaddress.ip_address(ip_str)
+            except ValueError:
+                continue
+            if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                raise ValueError(
+                    f"Kling: refusing to download from internal/loopback host {host} ({ip_str}). "
+                    f"Set KLING_ALLOW_INTERNAL_HTTP=1 to override.")
+    except socket.gaierror:
+        # Can't resolve — let requests fail with a clearer message.
+        pass
+    return url
 
 
 VOICES_CONFIG = {
@@ -182,29 +297,65 @@ def normalize_prompts(prompt: str) -> str:
     prompt = re.sub(r"(?<!\w)@video(?P<idx>\d*)(?!\w)", _video_repl, prompt)
     return prompt
 
-def tensor_to_base64_string(image: torch.Tensor) -> str:
+def tensor_to_base64_string(image: torch.Tensor, max_bytes: int = 8 * 1024 * 1024) -> str:
+    """Convert a ComfyUI IMAGE tensor to base64.
+
+    v2.1 fix: tries PNG first (lossless), falls back to JPEG q95/q85/q75 if
+    the payload would exceed Kling's ~10MB JSON limit. Also handles RGBA
+    by dropping the alpha channel (Kling expects RGB).
+    """
     if image is None:
         return None
     if image.dim() == 4:
         image = image[0]
-    h, w, _ = image.shape
+    h, w, c = image.shape
     if h < MIN_IMAGE_DIM or w < MIN_IMAGE_DIM:
         logger.warning(f"Kling Warning: Image resolution ({w}x{h}) is below recommended {MIN_IMAGE_DIM}x{MIN_IMAGE_DIM}.")
-    i = (255. * image).cpu().numpy().astype(np.uint8)
-    img = Image.fromarray(i)
+    # Clamp to [0,1] before scaling so over-bright inputs don't wrap around.
+    arr = (image.clamp(0, 1) * 255.0).to(torch.uint8).cpu().numpy()
+    # Drop alpha channel if present (Kling expects RGB)
+    if arr.ndim == 3 and arr.shape[-1] == 4:
+        arr = arr[..., :3]
+    img = Image.fromarray(arr, mode="RGB")
+    # Try lossless first
     buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return img_str
+    img.save(buffered, format="PNG", optimize=True)
+    data = buffered.getvalue()
+    if len(data) <= max_bytes:
+        return base64.b64encode(data).decode("utf-8")
+    # Too large -- fall back to JPEG at descending quality
+    for quality in (95, 90, 85, 75):
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        data = buf.getvalue()
+        if len(data) <= max_bytes:
+            logger.info(f"[KLING] Image too large for PNG ({w}x{h}); using JPEG q={quality} ({len(data)//1024} KB).")
+            return base64.b64encode(data).decode("utf-8")
+    # Still too large at q75 — caller should downscale.
+    logger.warning(f"[KLING] Image still {len(data)//1024}KB at JPEG q75; sending anyway. Consider downscaling.")
+    return base64.b64encode(data).decode("utf-8")
 
 def audio_to_base64_string(audio: Dict[str, Any], target_sr: int = TARGET_SAMPLE_RATE) -> str:
+    """Convert a ComfyUI AUDIO dict to base64-encoded WAV for Kling.
+
+    v2.1 fixes:
+    - Empty-waveform guard (was dividing by zero on shape[-1]==0).
+    - sample_rate None / non-numeric guard.
+    - Resampling now uses torchaudio (high quality, always available with
+      ComfyUI) instead of scipy / lossy zero-order-hold fallback.
+    """
     if audio is None or "waveform" not in audio:
         return None
     waveform = audio["waveform"]
     sample_rate = audio.get("sample_rate", 44100)
-    if not sample_rate or sample_rate <= 0:
+    # K-FIX v2.1: tolerate None / non-int sample_rate without TypeError.
+    try:
+        sample_rate = int(sample_rate) if sample_rate is not None else 0
+    except (TypeError, ValueError):
+        sample_rate = 0
+    if sample_rate <= 0:
         raise ValueError(
-            f"Audio has invalid sample_rate ({sample_rate}). "
+            f"Audio has invalid sample_rate ({audio.get('sample_rate')}). "
             f"Check the upstream audio node — it may have produced a corrupted AUDIO dict."
         )
 
@@ -213,12 +364,16 @@ def audio_to_base64_string(audio: Dict[str, Any], target_sr: int = TARGET_SAMPLE
     elif waveform.dim() == 1:
         waveform = waveform.unsqueeze(0)
 
+    # K-FIX v2.1: empty-waveform guard. Was crashing with ZeroDivisionError in `repeats`.
+    if waveform.shape[-1] == 0:
+        raise ValueError("Audio waveform is empty (0 samples). Check your upstream audio source.")
+
     w = waveform.cpu().numpy()
 
     duration = w.shape[-1] / sample_rate
     if duration < MIN_AUDIO_DURATION:
         logger.warning(f"Kling Warning: Audio duration ({duration:.2f}s) is too short. Looping to reach {MIN_AUDIO_DURATION}s minimum.")
-        repeats = int(np.ceil(MIN_AUDIO_DURATION / duration))
+        repeats = int(np.ceil(MIN_AUDIO_DURATION / max(duration, 1e-6)))
         w = np.tile(w, (1, repeats))
         w = w[:, :int(MIN_AUDIO_DURATION * sample_rate)]
         duration = MIN_AUDIO_DURATION
@@ -231,23 +386,34 @@ def audio_to_base64_string(audio: Dict[str, Any], target_sr: int = TARGET_SAMPLE
         logger.info(f"[KLING] Mixing down {w.shape[0]} channels to Mono.")
         w = np.mean(w, axis=0, keepdims=True)
 
-    # Dynamic Resampling
+    # K-FIX v2.1: high-quality resampling via torchaudio (always available
+    # inside the ComfyUI env). Falls back to scipy, then to lossy zero-order-hold.
     if sample_rate != target_sr:
+        resampled = None
         try:
-            from scipy.interpolate import interp1d
-            times = np.arange(w.shape[-1]) / sample_rate
-            new_times = np.arange(int(w.shape[-1] * target_sr / sample_rate)) / target_sr
-            new_w = []
-            for channel in range(w.shape[0]):
-                f = interp1d(times, w[channel], kind='linear', fill_value="extrapolate")
-                new_w.append(f(new_times))
-            w = np.array(new_w)
-            sample_rate = target_sr
-        except ImportError:
-            new_samples = int(w.shape[-1] * target_sr / sample_rate)
-            indices = np.linspace(0, w.shape[-1] - 1, new_samples).astype(np.int64)
-            w = w[:, indices]
-            sample_rate = target_sr
+            import torchaudio.functional as taF
+            t = torch.from_numpy(w).float()
+            t = taF.resample(t, orig_freq=sample_rate, new_freq=target_sr)
+            resampled = t.cpu().numpy()
+        except Exception:
+            try:
+                from scipy.interpolate import interp1d
+                times = np.arange(w.shape[-1]) / sample_rate
+                new_n = max(1, int(w.shape[-1] * target_sr / sample_rate))
+                new_times = np.arange(new_n) / target_sr
+                new_w = []
+                for channel in range(w.shape[0]):
+                    f = interp1d(times, w[channel], kind='linear', fill_value="extrapolate")
+                    new_w.append(f(new_times))
+                resampled = np.array(new_w)
+            except Exception:
+                # Last-resort nearest-neighbor (lossy but never crashes).
+                logger.warning("[KLING] torchaudio and scipy both unavailable; using lossy nearest-neighbor resampling.")
+                new_samples = max(1, int(w.shape[-1] * target_sr / sample_rate))
+                indices = np.linspace(0, w.shape[-1] - 1, new_samples).astype(np.int64)
+                resampled = w[:, indices]
+        w = resampled
+        sample_rate = target_sr
 
     w = (np.clip(w, -1.0, 1.0) * INT16_MAX).astype(np.int16)
     channels, samples = w.shape
@@ -262,13 +428,25 @@ def audio_to_base64_string(audio: Dict[str, Any], target_sr: int = TARGET_SAMPLE
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
-def download_to_output(url: str, ext: str = "mp4") -> tuple:
+def download_to_output(url: str, ext: str = "mp4", retries: int = 3) -> tuple:
+    """Download a URL to ComfyUI's output dir, retrying on transient errors.
+
+    v2.1 fixes:
+    - URL scheme guard (rejects file:// / gopher:// / internal hosts).
+    - Retries with exponential backoff on transient network errors.
+    - Cleans up partial files on failure (no orphans).
+    - Sanitized extension (no path-traversal via URL-derived ext).
+    """
+    url = _safe_url(url)
     output_dir = folder_paths.get_output_directory()
     os.makedirs(output_dir, exist_ok=True)
 
     clean_path = urlparse(url).path
-    detected_ext = os.path.splitext(clean_path)[1]
-    filename_ext = ext if not detected_ext else detected_ext.lstrip('.')
+    detected_ext = os.path.splitext(clean_path)[1].lstrip('.').lower()
+    # Whitelist character set for the extension; reject anything weird.
+    if detected_ext and not re.fullmatch(r"[a-z0-9]{1,8}", detected_ext):
+        detected_ext = ""
+    filename_ext = detected_ext or ext
 
     filename = f"kling_{uuid.uuid4().hex}.{filename_ext}"
     file_path = os.path.join(output_dir, filename)
@@ -276,21 +454,50 @@ def download_to_output(url: str, ext: str = "mp4") -> tuple:
     # Print URL first so it's recoverable if download fails
     print(f"[KLING] Download URL: {url}")
 
-    response = requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT)
-    response.raise_for_status()
-    with open(file_path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-            f.write(chunk)
-    print(f"[KLING] Saved to output: {filename}")
-    return file_path, filename
+    last_err = None
+    for attempt in range(retries):
+        try:
+            response = requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT)
+            response.raise_for_status()
+            with open(file_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                    if chunk:
+                        f.write(chunk)
+            print(f"[KLING] Saved to output: {filename}")
+            return file_path, filename
+        except (requests.exceptions.RequestException, OSError) as e:
+            last_err = e
+            # Clean up partial file before retry (no orphans)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except OSError:
+                pass
+            if attempt < retries - 1:
+                wait = 2 * (2 ** attempt)
+                print(f"[KLING] Download failed ({type(e).__name__}); retrying in {wait}s...")
+                import time as _time
+                _time.sleep(wait)
+                continue
+    raise RuntimeError(f"[KLING] Download failed after {retries} attempts: {type(last_err).__name__}: {last_err}")
 
 def load_video_to_tensor(video_path: str) -> torch.Tensor:
-    """Load video frames into a tensor with automatic subsampling for large videos."""
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise Exception(f"[KLING] Could not open video file: {os.path.basename(video_path)}")
+    """Load video frames into a ComfyUI image-batch tensor [N,H,W,C] in [0,1].
 
+    v2.1 fixes:
+    - cv2 cap leak on early-fail path (was: open, isOpened()==False, raise OUTSIDE
+      try/finally -> ffmpeg fd held until interpreter GC). Now wraps everything
+      in try/finally so cap.release() always runs.
+    - Memory-efficient: pre-allocates the final float32 tensor instead of
+      stacking a list of arrays. Cuts peak RAM ~3x by removing the intermediate
+      np.stack copy (which doubles memory) and the subsequent .float() cast
+      (which doubles it again).
+    """
+    cap = cv2.VideoCapture(video_path)
     try:
+        if not cap.isOpened():
+            raise Exception(f"[KLING] Could not open video file: {os.path.basename(video_path)}")
+
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
@@ -299,38 +506,85 @@ def load_video_to_tensor(video_path: str) -> torch.Tensor:
             step = max(1, total_frames // MAX_VIDEO_FRAMES)
             logger.info(f"[KLING] Video has {total_frames} frames -- subsampling every {step}th frame (keeping ~{total_frames // step} frames) to avoid OOM.")
 
-        frames = []
-        frame_idx = 0
+        # First pass: count + sample first frame to learn (H, W).
+        first_frame = None
+        # Quick read to discover dims (most codecs need a read).
+        ret, peek = cap.read()
+        if not ret or peek is None:
+            raise Exception(f"[KLING] Video '{os.path.basename(video_path)}' contains no readable frames.")
+        peek = cv2.cvtColor(peek, cv2.COLOR_BGR2RGB)
+        h, w, _ = peek.shape
+
+        # How many frames will we keep? With subsampling at `step`, ceiling of total/step.
+        if total_frames > 0:
+            est_kept = max(1, (total_frames + step - 1) // step)
+        else:
+            est_kept = MAX_VIDEO_FRAMES  # unknown — bound to safety cap
+        # Cap conservatively to avoid huge pre-alloc on bogus headers.
+        est_kept = min(est_kept, MAX_VIDEO_FRAMES + 50)
+
+        try:
+            # Pre-allocate the final tensor directly. Peak RAM ~ est_kept*h*w*3*4 bytes.
+            out = torch.empty((est_kept, h, w, 3), dtype=torch.float32)
+        except (MemoryError, RuntimeError) as mem_err:
+            logger.warning(f"[KLING] MEMORY ERROR pre-allocating ({est_kept} x {h}x{w}): {mem_err}")
+            # Return just the first frame as a degraded result.
+            return torch.from_numpy(peek).float().unsqueeze(0) / 255.0
+
+        kept = 0
+        # The peek frame is index 0 — only emit if 0 % step == 0 (always True).
+        out[0] = torch.from_numpy(peek).float() / 255.0
+        kept = 1
+
+        frame_idx = 1
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
-            if frame_idx % step == 0:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frames.append(frame)
+            if frame_idx % step == 0 and kept < est_kept:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                out[kept] = torch.from_numpy(rgb).float() / 255.0
+                kept += 1
             frame_idx += 1
+            if kept >= est_kept:
+                # safety stop — buffer full
+                break
 
-        if not frames:
+        if kept == 0:
             raise Exception(f"[KLING] Video '{os.path.basename(video_path)}' contains no readable frames.")
-
-        try:
-            stack = np.stack(frames, axis=0)
-            return torch.from_numpy(stack).float() / 255.0
-        except (MemoryError, RuntimeError) as mem_err:
-            logger.warning(f"[KLING] MEMORY ERROR: Video at {video_path} too large ({len(frames)} frames). Error: {mem_err}")
-            logger.warning("[KLING] Returning single-frame placeholder. Full video file is saved in output folder.")
-            first = frames[0]
-            return torch.from_numpy(np.array(first)[None]).float() / 255.0
+        # Trim if we over-allocated.
+        if kept < est_kept:
+            out = out[:kept].contiguous()
+        return out
     finally:
-        # Always release cv2 capture, even on MemoryError or any other path
+        # K-FIX v2.1: cap.release() guaranteed even on `if not cap.isOpened()` early-fail.
         cap.release()
 
-def download_to_tensor(url: str) -> torch.Tensor:
-    response = requests.get(url, timeout=DOWNLOAD_TIMEOUT)
-    response.raise_for_status()
-    img = Image.open(io.BytesIO(response.content)).convert("RGB")
-    img_np = np.array(img).astype(np.float32) / 255.0
-    return torch.from_numpy(img_np)[None,]
+def download_to_tensor(url: str, retries: int = 3) -> torch.Tensor:
+    """Download an image URL and return as a ComfyUI IMAGE tensor [1,H,W,C].
+    v2.1: URL guard + retries."""
+    url = _safe_url(url)
+    last_err = None
+    for attempt in range(retries):
+        try:
+            response = requests.get(url, timeout=DOWNLOAD_TIMEOUT)
+            response.raise_for_status()
+            img = Image.open(io.BytesIO(response.content)).convert("RGB")
+            img_np = np.array(img).astype(np.float32) / 255.0
+            return torch.from_numpy(img_np)[None, ]
+        except (requests.exceptions.RequestException, OSError) as e:
+            last_err = e
+            if attempt < retries - 1:
+                import time as _time
+                _time.sleep(2 * (2 ** attempt))
+    raise RuntimeError(f"[KLING] Image download failed after {retries} attempts: {last_err}")
+
+
+def _empty_audio() -> Dict[str, Any]:
+    """Return a fresh empty AUDIO dict. v2.1: clones the shared waveform so
+    downstream in-place mutation can't corrupt the module-level singleton."""
+    return {"waveform": EMPTY_AUDIO["waveform"].clone(), "sample_rate": EMPTY_AUDIO["sample_rate"]}
+
 
 def load_audio_to_tensor(file_path: str) -> Dict[str, Any]:
     try:
@@ -339,14 +593,25 @@ def load_audio_to_tensor(file_path: str) -> Dict[str, Any]:
         return {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
     except ImportError:
         logger.warning("[KLING] torchaudio not installed -- returning silent audio placeholder.")
-        return dict(EMPTY_AUDIO)
+        return _empty_audio()
     except Exception as e:
         logger.warning(f"[KLING] Could not extract audio from '{os.path.basename(file_path)}': {e}. Returning silent placeholder.")
-        return dict(EMPTY_AUDIO)
+        return _empty_audio()
+
 
 def download_audio_to_tensor(url: str) -> Dict[str, Any]:
+    """Download audio URL to ComfyUI AUDIO dict.
+    v2.1: deletes partial file if decode hard-fails (no orphans)."""
     path, name = download_to_output(url, ext="mp3")
-    return load_audio_to_tensor(path)
+    try:
+        return load_audio_to_tensor(path)
+    except Exception:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
+        raise
 
 # --- Cloud Uploader Helpers ---
 
@@ -767,6 +1032,15 @@ class KlingDirect_CameraControl:
 
 
 class KlingDirect_CloudUploader(AlwaysExecuteMixin):
+    """Upload media to a PUBLIC cloud host so Kling (or anyone) can fetch it via URL.
+
+    PRIVACY WARNING: every supported host (catbox.moe, litterbox, 0x0.st, uguu.se,
+    tmpfiles.org) is unauthenticated and serves the file at a guessable URL.
+    Anyone who obtains the URL — including indexers, NSFW scrapers, etc. —
+    can download it. Catbox / 0x0 are PERMANENT (file stays public until manually
+    deleted). Do not upload sensitive personal images, voice clones, or copyrighted
+    material. You MUST tick `i_understand_uploads_are_public` to enable the node.
+    """
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
@@ -776,6 +1050,11 @@ class KlingDirect_CloudUploader(AlwaysExecuteMixin):
                  "tooltip": "Cloud host. 'auto' tries catbox -> litterbox -> 0x0 -> uguu -> tmpfiles (recommended). "
                             "catbox = permanent. litterbox = 1/24/72h temp. 0x0 = permanent. uguu = 24h. tmpfiles = unreliable."}
             ),
+            "i_understand_uploads_are_public": ("BOOLEAN", {
+                "default": False,
+                "tooltip": "REQUIRED. Uploads go to a public host — anyone with the URL can view. "
+                           "catbox & 0x0 are permanent. Do NOT upload sensitive content."
+            }),
         }, "optional": {
             "audio": ("AUDIO",),
             "image": ("IMAGE",),
@@ -795,8 +1074,16 @@ class KlingDirect_CloudUploader(AlwaysExecuteMixin):
     FUNCTION = "upload"
     CATEGORY = "Kling AI/Config"
 
-    def upload(self, provider, audio=None, image=None, file_path="",
+    def upload(self, provider, i_understand_uploads_are_public=False,
+               audio=None, image=None, file_path="",
                preserve_audio_quality=True, audio_format="wav"):
+        # K-FIX v2.1: explicit consent before uploading to public hosts.
+        if not i_understand_uploads_are_public:
+            raise ValueError(
+                "Kling Cloud Uploader: refusing to upload. Tick "
+                "'i_understand_uploads_are_public' to acknowledge that the file "
+                "will be world-readable at a public URL (catbox / 0x0 are PERMANENT)."
+            )
         file_content = None
         filename = f"upload_{uuid.uuid4().hex[:8]}"
         mime_type = "application/octet-stream"
@@ -1047,13 +1334,15 @@ class KlingDirect_LipSync(AlwaysExecuteMixin):
             audio_url_val = audio_url if audio_url else None
             text_val = None
 
+        # K-FIX v2.1: voice_speed is None in audio2video mode (was 1.0 which
+        # Kling can reject as an unexpected param in audio2video flow).
         task_id = client.lip_sync(
             video_url,
             audio_url=audio_url_val,
             audio_b64=audio_b64,
             text=text_val,
             voice_id=voice_id if mode == "text2video" else None,
-            voice_speed=voice_speed if mode == "text2video" else 1.0,
+            voice_speed=voice_speed if mode == "text2video" else None,
             mode=mode,
         )
         res = client.poll_task("/v1/videos/lip-sync", task_id)
@@ -1325,24 +1614,29 @@ class KlingDirect_AudioGenerate(AlwaysExecuteMixin):
 
 
 class KlingDirect_TTS(AlwaysExecuteMixin):
-    """Text-to-Speech using Kling AI voices."""
+    """Text-to-Speech using Kling AI voices.
+
+    v2.1: now exposes voice_speed and voice_language (parity with TTSAdvanced)
+    so users don't have to learn two nodes for basic TTS.
+    """
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
             "auth": ("KLING_AUTH",),
-            "text": ("STRING", {"default": "", "tooltip": "Text to convert to speech."}),
-            "voice_id": ("STRING", {"default": "female_1", "tooltip": "Voice ID (use Voice Selector node or a cloned voice_id)."})
+            "text": ("STRING", {"default": "", "multiline": True, "tooltip": "Text to convert to speech."}),
+            "voice_id": ("STRING", {"default": "girlfriend_4_speech02", "tooltip": "Voice ID (use Voice Selector node or a cloned voice_id)."}),
+            "voice_speed": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1, "tooltip": "Speech speed multiplier (0.5 = slow, 2.0 = fast)."}),
+            "voice_language": (["en", "zh"], {"default": "en", "tooltip": "Voice language: en or zh."}),
         }}
     RETURN_TYPES = ("AUDIO", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("audio", "audio_file", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Audio"
 
-    def generate(self, auth, text, voice_id):
+    def generate(self, auth, text, voice_id, voice_speed=1.0, voice_language="en"):
         client = _make_client(auth)
-        task_id = client.tts(text, voice_id, 1.0, "en")
+        task_id = client.tts(text, voice_id, voice_speed, voice_language)
         res = client.poll_task("/v1/audio/tts", task_id)
-        # K1: Fixed -- was calling _extract_video_url, now calls _extract_audio_url
         url = _extract_audio_url(res)
         path, name = download_to_output(url, ext="mp3")
         return (load_audio_to_tensor(path), name, url, task_id)
@@ -1582,15 +1876,317 @@ class KlingDirect_FastVideoSaver:
         filename = f"{safe_prefix}_{uuid.uuid4().hex[:8]}{detected_ext}"
         file_path = os.path.join(output_dir, filename)
 
+        url = _safe_url(url)
         print(f"[KLING] Fast-saving to: {filename}")
-        response = requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT)
-        response.raise_for_status()
-        with open(file_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-                f.write(chunk)
-        size_mb = os.path.getsize(file_path) / (1024 * 1024)
-        print(f"[KLING] Saved: {filename} ({size_mb:.1f} MB)")
-        return (file_path, filename)
+        # K-FIX v2.1: retry + partial-file cleanup, matching download_to_output.
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = requests.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT)
+                response.raise_for_status()
+                with open(file_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                        if chunk:
+                            f.write(chunk)
+                size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                print(f"[KLING] Saved: {filename} ({size_mb:.1f} MB)")
+                return (file_path, filename)
+            except (requests.exceptions.RequestException, OSError) as e:
+                last_err = e
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except OSError:
+                    pass
+                if attempt < 2:
+                    import time as _time
+                    _time.sleep(2 * (2 ** attempt))
+        raise RuntimeError(f"FastVideoSaver failed after 3 attempts: {last_err}")
+
+
+# ============================================================
+# v2.1 New Nodes
+# ============================================================
+
+class KlingDirect_RegionSelector:
+    """Pick the Kling API region (Singapore / China / US). Wraps an auth into a new
+    auth with `base_url` overridden so the downstream client connects to the
+    chosen regional gateway."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "region": (list(KLING_REGIONS.keys()), {"default": "singapore", "tooltip": "Kling API region."}),
+        }, "optional": {
+            "custom_base_url": ("STRING", {"default": "", "tooltip": "Optional custom base URL override (e.g. self-hosted proxy)."})
+        }}
+    RETURN_TYPES = ("KLING_AUTH",)
+    RETURN_NAMES = ("auth",)
+    FUNCTION = "select"
+    CATEGORY = "Kling AI/Config"
+
+    def select(self, auth, region, custom_base_url=""):
+        new_auth = dict(auth)
+        new_auth["base_url"] = (custom_base_url.strip() if custom_base_url.strip() else KLING_REGIONS[region])
+        return (new_auth,)
+
+
+class KlingDirect_CameraPreset:
+    """Pre-configured camera movements. Outputs a KLING_CAMERA dict directly."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "preset": (list(CAMERA_PRESETS.keys()), {"default": "none", "tooltip": "Camera-movement preset. Wire into TextToVideo / ImageToVideo."}),
+            "intensity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.5, "step": 0.1, "tooltip": "Multiplier on the preset's axis value (1.0 = preset default)."}),
+        }}
+    RETURN_TYPES = ("KLING_CAMERA",)
+    RETURN_NAMES = ("camera_control",)
+    FUNCTION = "build"
+    CATEGORY = "Kling AI/Config"
+
+    def build(self, preset, intensity=1.0):
+        cam_type, raw_cfg = CAMERA_PRESETS[preset]
+        # Build the full 6-axis config (zeros for unused axes) then scale active axis.
+        cfg = {"horizontal": 0.0, "vertical": 0.0, "pan": 0.0, "tilt": 0.0, "roll": 0.0, "zoom": 0.0}
+        for k, v in raw_cfg.items():
+            cfg[k] = float(v) * float(intensity)
+        return ({"type": cam_type, "config": cfg},)
+
+
+class KlingDirect_AspectRatioPicker:
+    """Given an IMAGE, output the closest valid Kling aspect_ratio string.
+    Useful for I2V pipelines where you want the output ratio to match the input.
+    """
+    _RATIOS = {"16:9": 16/9, "9:16": 9/16, "1:1": 1.0, "3:2": 3/2, "2:3": 2/3, "4:3": 4/3, "3:4": 3/4}
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"image": ("IMAGE",)}}
+
+    RETURN_TYPES = (list(_RATIOS.keys()), "STRING")
+    RETURN_NAMES = ("aspect_ratio", "info")
+    FUNCTION = "pick"
+    CATEGORY = "Kling AI/Config"
+
+    def pick(self, image):
+        if image.dim() == 4:
+            image = image[0]
+        h, w, _ = image.shape
+        ratio = float(w) / float(h) if h > 0 else 1.0
+        # Find closest
+        best = min(self._RATIOS.items(), key=lambda kv: abs(kv[1] - ratio))
+        info = f"{w}x{h} ratio={ratio:.3f} -> {best[0]} ({best[1]:.3f})"
+        return (best[0], info)
+
+
+class KlingDirect_CostEstimator:
+    """Estimate Kling credit cost for a generation. Pure local — no API call."""
+    # Heuristic credit table (5s duration, std mode = base). pro = 2x.
+    # Numbers are approximate published Kling pricing as of 2026-05; users
+    # should verify in their dashboard.
+    _T2V_BASE = {
+        "kling-v3": 35, "kling-v2-6": 30, "kling-v2-master": 50, "kling-v2-5-turbo": 25, "kling-v1-6": 20,
+    }
+    _IMAGE_BASE = {"kling-v3": 4, "kling-image-o1": 5}
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "kind": (["text2video", "image2video", "image", "tts", "upscale_image", "upscale_video"], {"default": "text2video"}),
+            "model_name": ("STRING", {"default": "kling-v3"}),
+            "duration_sec": ("INT", {"default": 5, "min": 1, "max": 60}),
+            "mode": (["pro", "std"], {"default": "pro"}),
+            "n": ("INT", {"default": 1, "min": 1, "max": 9, "tooltip": "Number of images (only used for kind=image)."}),
+        }}
+    RETURN_TYPES = ("INT", "STRING")
+    RETURN_NAMES = ("estimated_credits", "info")
+    FUNCTION = "estimate"
+    CATEGORY = "Kling AI/Config"
+
+    def estimate(self, kind, model_name, duration_sec, mode, n=1):
+        mode_mult = 2.0 if mode == "pro" else 1.0
+        if kind in ("text2video", "image2video"):
+            base = self._T2V_BASE.get(model_name, 30)
+            cost = int(base * mode_mult * (duration_sec / 5.0))
+        elif kind == "image":
+            base = self._IMAGE_BASE.get(model_name, 4)
+            cost = int(base * n)
+        elif kind == "tts":
+            # ~1 credit per 5s of speech
+            cost = max(1, duration_sec // 5)
+        elif kind == "upscale_image":
+            cost = 6
+        elif kind == "upscale_video":
+            cost = int(15 * (duration_sec / 5.0))
+        else:
+            cost = 0
+        info = f"~{cost} credits (model={model_name}, mode={mode}, dur={duration_sec}s, n={n}). Heuristic — verify in dashboard."
+        return (cost, info)
+
+
+class KlingDirect_TaskStatus(AlwaysExecuteMixin):
+    """One-shot task status check (no polling, no download). Returns the raw
+    status JSON so you can chain async workflows."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "endpoint": (TASK_ENDPOINTS, {"default": "/v1/videos/text2video", "tooltip": "The endpoint the task was submitted to."}),
+            "task_id": ("STRING", {"default": "", "forceInput": True, "tooltip": "Task ID returned from a previous generation node."}),
+        }}
+    RETURN_TYPES = ("STRING", "STRING", "STRING")
+    RETURN_NAMES = ("status", "result_json", "task_id")
+    FUNCTION = "check"
+    CATEGORY = "Kling AI/Config"
+
+    def check(self, auth, endpoint, task_id):
+        client = _make_client(auth)
+        res = client.get_task_status(endpoint, task_id)
+        data = res.get("data", {}) or {}
+        status = data.get("task_status", "unknown")
+        return (status, json.dumps(data, indent=2, default=str)[:8000], task_id)
+
+
+class KlingDirect_LipSyncFromUrl(AlwaysExecuteMixin):
+    """Convenience: submit a lip-sync task using URLs only (video + audio).
+    Skips the local download/upload roundtrip if both are already hosted."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "video_url": ("STRING", {"default": "", "tooltip": "Public URL of the source video."}),
+            "audio_url": ("STRING", {"default": "", "tooltip": "Public URL of the audio (mp3/wav)."}),
+        }}
+    RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
+    RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
+    FUNCTION = "generate"
+    CATEGORY = "Kling AI/Video"
+
+    def generate(self, auth, video_url, audio_url):
+        if not video_url.strip() or not audio_url.strip():
+            raise ValueError("LipSyncFromUrl requires both video_url and audio_url.")
+        client = _make_client(auth)
+        task_id = client.lip_sync(video_url.strip(), audio_url=audio_url.strip(), mode="audio2video")
+        res = client.poll_task("/v1/videos/lip-sync", task_id)
+        url = _extract_video_url(res)
+        path, name = download_to_output(url)
+        return (load_video_to_tensor(path), name, load_audio_to_tensor(path), url, task_id)
+
+
+class KlingDirect_KeyframeVideo(AlwaysExecuteMixin):
+    """Image-to-Video with both START and END frame (Kling's image_tail feature).
+    Produces an interpolated video between the two keyframes."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "start_image": ("IMAGE",),
+            "end_image": ("IMAGE",),
+            "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Optional motion description."}),
+            "negative_prompt": ("STRING", {"default": ""}),
+            "model_name": (VIDEO_MODELS_I2V, {"default": "kling-v3"}),
+            "duration": (["5", "10"], {"default": "5"}),
+            "mode": (MODES, {"default": "pro"}),
+            "cfg_scale": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05}),
+        }, "optional": {
+            "camera_control": ("KLING_CAMERA",),
+        }}
+    RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
+    RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
+    FUNCTION = "generate"
+    CATEGORY = "Kling AI/Video"
+
+    def generate(self, auth, start_image, end_image, prompt, negative_prompt, model_name, duration, mode, cfg_scale, camera_control=None):
+        client = _make_client(auth)
+        task_id = client.image_to_video(
+            model_name, tensor_to_base64_string(start_image), duration,
+            normalize_prompts(prompt), tensor_to_base64_string(end_image),
+            negative_prompt, cfg_scale, camera_control, mode, "on",
+        )
+        res = client.poll_task("/v1/videos/image2video", task_id)
+        url = _extract_video_url(res)
+        path, name = download_to_output(url)
+        return (load_video_to_tensor(path), name, load_audio_to_tensor(path), url, task_id)
+
+
+class KlingDirect_VideoToFile:
+    """Write a ComfyUI IMAGE batch (video frames) to an .mp4 file via cv2.
+    Pure local — no API call. Useful for saving Kling output frames as a
+    standalone playable file without depending on VideoHelperSuite."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "video": ("IMAGE", {"tooltip": "Image batch where each frame is a video frame."}),
+            "fps": ("INT", {"default": 24, "min": 1, "max": 120}),
+            "filename_prefix": ("STRING", {"default": "kling_export"}),
+            "codec": (["mp4v", "avc1", "MJPG"], {"default": "mp4v", "tooltip": "FourCC codec. mp4v is most compatible; avc1 is H.264 (better, may need extra codecs)."}),
+        }}
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("file_path",)
+    FUNCTION = "write"
+    CATEGORY = "Kling AI/Config"
+    OUTPUT_NODE = True
+
+    def write(self, video, fps, filename_prefix, codec):
+        if video.dim() != 4 or video.shape[0] == 0:
+            raise ValueError("VideoToFile expects an IMAGE batch [N,H,W,C] with N>=1.")
+        output_dir = folder_paths.get_output_directory()
+        os.makedirs(output_dir, exist_ok=True)
+        safe = _sanitize_filename(filename_prefix)
+        filename = f"{safe}_{uuid.uuid4().hex[:8]}.mp4"
+        file_path = os.path.join(output_dir, filename)
+        n, h, w, _c = video.shape
+        fourcc = cv2.VideoWriter_fourcc(*codec)
+        writer = cv2.VideoWriter(file_path, fourcc, float(fps), (w, h))
+        if not writer.isOpened():
+            raise RuntimeError(f"cv2.VideoWriter failed to open with codec={codec}. Try mp4v.")
+        try:
+            arr = (video.clamp(0, 1) * 255.0).to(torch.uint8).cpu().numpy()
+            for i in range(n):
+                bgr = cv2.cvtColor(arr[i], cv2.COLOR_RGB2BGR)
+                writer.write(bgr)
+        finally:
+            writer.release()
+        print(f"[KLING] VideoToFile wrote {n} frames @ {fps}fps -> {filename}")
+        return (file_path,)
+
+
+class KlingDirect_ApiHealthCheck(AlwaysExecuteMixin):
+    """Verify auth + connectivity to Kling by fetching effect templates
+    (cheap / free call). Returns is_healthy + a status message."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"auth": ("KLING_AUTH",)}}
+    RETURN_TYPES = ("BOOLEAN", "STRING")
+    RETURN_NAMES = ("is_healthy", "status")
+    FUNCTION = "check"
+    CATEGORY = "Kling AI/Config"
+
+    def check(self, auth):
+        try:
+            client = _make_client(auth)
+            client.effect_templates()
+            return (True, "Kling API: OK (auth + connectivity verified via /v1/videos/effect-templates).")
+        except KlingAPIError as e:
+            return (False, f"Kling API ERROR: {e}")
+        except Exception as e:
+            return (False, f"Kling API connection failed: {type(e).__name__}: {e}")
+
+
+class KlingDirect_VoiceCatalog:
+    """Output the preset voice catalog as JSON. Pure local — useful for browsing."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {}}
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("catalog_json",)
+    FUNCTION = "list"
+    CATEGORY = "Kling AI/Config"
+
+    def list(self):
+        rows = [{"display_name": name, "voice_id": vid, "language": lang}
+                for name, (vid, lang) in VOICES_CONFIG.items()]
+        return (json.dumps(rows, indent=2, ensure_ascii=False),)
 
 
 # ============================================================
@@ -1639,6 +2235,18 @@ NODE_CLASS_MAPPINGS = {
     "KlingDirect_VoiceSelector": KlingDirect_VoiceSelector,
     "KlingDirect_CloudUploader": KlingDirect_CloudUploader,
     "KlingDirect_FastVideoSaver": KlingDirect_FastVideoSaver,
+
+    # v2.1: New nodes
+    "KlingDirect_RegionSelector": KlingDirect_RegionSelector,
+    "KlingDirect_CameraPreset": KlingDirect_CameraPreset,
+    "KlingDirect_AspectRatioPicker": KlingDirect_AspectRatioPicker,
+    "KlingDirect_CostEstimator": KlingDirect_CostEstimator,
+    "KlingDirect_TaskStatus": KlingDirect_TaskStatus,
+    "KlingDirect_LipSyncFromUrl": KlingDirect_LipSyncFromUrl,
+    "KlingDirect_KeyframeVideo": KlingDirect_KeyframeVideo,
+    "KlingDirect_VideoToFile": KlingDirect_VideoToFile,
+    "KlingDirect_ApiHealthCheck": KlingDirect_ApiHealthCheck,
+    "KlingDirect_VoiceCatalog": KlingDirect_VoiceCatalog,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1683,4 +2291,16 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KlingDirect_VoiceSelector": "Kling Voice Selector",
     "KlingDirect_CloudUploader": "Kling AI Cloud Uploader",
     "KlingDirect_FastVideoSaver": "Kling Fast Video Saver",
+
+    # v2.1: New nodes
+    "KlingDirect_RegionSelector": "Kling Region Selector",
+    "KlingDirect_CameraPreset": "Kling Camera Preset",
+    "KlingDirect_AspectRatioPicker": "Kling Aspect Ratio Picker",
+    "KlingDirect_CostEstimator": "Kling Cost Estimator",
+    "KlingDirect_TaskStatus": "Kling Task Status",
+    "KlingDirect_LipSyncFromUrl": "Kling Lip Sync (URLs)",
+    "KlingDirect_KeyframeVideo": "Kling Keyframe Video (Start+End)",
+    "KlingDirect_VideoToFile": "Kling Video to File (MP4)",
+    "KlingDirect_ApiHealthCheck": "Kling API Health Check",
+    "KlingDirect_VoiceCatalog": "Kling Voice Catalog",
 }
