@@ -5,6 +5,14 @@ All notable changes to ComfyUI-Kling-Direct are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.4] — 2026-05-17
+
+Republish to resolve registry/local version drift. Prior publish attempts
+shipped 2.1.1 → 2.1.3 to the Comfy Registry ahead of the GitHub tag, leaving
+the local tree at v2.1.0 while the registry advertised 2.1.3. No source
+changes vs the 2.1.3 registry build — this version exists so the GitHub tag
+and registry version match again.
+
 ## [2.1.0] — 2026-05-17
 
 Audit + hardening release driven by two parallel Gemini Pro full-codebase reviews
