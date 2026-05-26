@@ -1,0 +1,333 @@
+{
+  "last_node_id": 5,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "KlingDirect_Auth",
+      "pos": [
+        50,
+        50
+      ],
+      "size": [
+        320,
+        134
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "auth",
+        "Node name for S&R": "KlingDirect_Auth"
+      },
+      "widgets_values": [
+        "",
+        "",
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        50,
+        214
+      ],
+      "size": [
+        320,
+        108
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "img",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 3,
+      "type": "KlingDirect_AssetUpload",
+      "pos": [
+        430,
+        50
+      ],
+      "size": [
+        320,
+        148
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 1
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "asset_id",
+          "type": "STRING",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "asset_url",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "upload",
+        "Node name for S&R": "KlingDirect_AssetUpload"
+      },
+      "widgets_values": [
+        "image",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "KlingDirect_ImageExtend",
+      "pos": [
+        810,
+        50
+      ],
+      "size": [
+        320,
+        162
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 2
+        },
+        {
+          "name": "image_id",
+          "type": "STRING",
+          "link": 4,
+          "widget": {
+            "name": "image_id"
+          }
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "url",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "recipe_id": "extend",
+        "Node name for S&R": "KlingDirect_ImageExtend"
+      },
+      "widgets_values": [
+        "Extend the scene naturally, maintaining the same lighting, style, and atmosphere",
+        "16:9"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "PreviewImage",
+      "pos": [
+        1190,
+        50
+      ],
+      "size": [
+        320,
+        74
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "recipe_id": "preview",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      3,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      2,
+      1,
+      0,
+      4,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      3,
+      2,
+      0,
+      3,
+      1,
+      "IMAGE"
+    ],
+    [
+      4,
+      3,
+      0,
+      4,
+      1,
+      "STRING"
+    ],
+    [
+      5,
+      4,
+      0,
+      5,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Setup",
+      "bounding": [
+        30,
+        0,
+        360,
+        342
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Upload",
+      "bounding": [
+        410,
+        0,
+        360,
+        218
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Action",
+      "bounding": [
+        790,
+        0,
+        360,
+        232
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        1170,
+        0,
+        360,
+        144
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "description": "Expand an image to a wider aspect ratio: upload to Kling cloud, then extend the canvas with AI-generated content.",
+    "title": "Kling \u2014 Image Extend (Outpaint)",
+    "tier": 1,
+    "pack": "ComfyUI-Kling-Direct"
+  },
+  "version": 0.4
+}

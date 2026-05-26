@@ -1,0 +1,138 @@
+{
+  "last_node_id": 2,
+  "last_link_id": 1,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "KlingDirect_CostEstimator",
+      "pos": [
+        50,
+        50
+      ],
+      "size": [
+        320,
+        188
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "estimated_credits",
+          "type": "INT",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": [
+            1
+          ],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "estimator",
+        "Node name for S&R": "KlingDirect_CostEstimator"
+      },
+      "widgets_values": [
+        "text2video",
+        "kling-v3",
+        5,
+        "pro",
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "type": "ShowText",
+      "pos": [
+        430,
+        50
+      ],
+      "size": [
+        320,
+        94
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 1,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "out",
+        "Node name for S&R": "ShowText"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      1,
+      2,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Action",
+      "bounding": [
+        30,
+        0,
+        360,
+        258
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        410,
+        0,
+        360,
+        164
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "description": "Estimate Kling credit cost before running a generation job. Choose task type, model, duration, and mode to see the credit price.",
+    "title": "Kling \u2014 Cost Estimator",
+    "tier": 1,
+    "pack": "ComfyUI-Kling-Direct"
+  },
+  "version": 0.4
+}

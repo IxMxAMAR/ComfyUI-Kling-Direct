@@ -1,0 +1,193 @@
+{
+  "last_node_id": 3,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "KlingDirect_Auth",
+      "pos": [
+        50,
+        50
+      ],
+      "size": [
+        320,
+        134
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "auth",
+        "Node name for S&R": "KlingDirect_Auth"
+      },
+      "widgets_values": [
+        "",
+        "",
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "KlingDirect_ApiHealthCheck",
+      "pos": [
+        430,
+        50
+      ],
+      "size": [
+        320,
+        88
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "is_healthy",
+          "type": "BOOLEAN",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": [
+            2
+          ],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "health",
+        "Node name for S&R": "KlingDirect_ApiHealthCheck"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 3,
+      "type": "ShowText",
+      "pos": [
+        810,
+        50
+      ],
+      "size": [
+        320,
+        94
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 2,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "out",
+        "Node name for S&R": "ShowText"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      2,
+      2,
+      1,
+      3,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Setup",
+      "bounding": [
+        30,
+        0,
+        360,
+        204
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Action",
+      "bounding": [
+        410,
+        0,
+        360,
+        158
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        790,
+        0,
+        360,
+        164
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "description": "Verify your Kling API credentials are working: runs a lightweight health-check request and shows the status.",
+    "title": "Kling \u2014 API Health Check",
+    "tier": 1,
+    "pack": "ComfyUI-Kling-Direct"
+  },
+  "version": 0.4
+}

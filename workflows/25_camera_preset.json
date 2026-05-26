@@ -1,0 +1,276 @@
+{
+  "last_node_id": 4,
+  "last_link_id": 3,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "KlingDirect_Auth",
+      "pos": [
+        50,
+        50
+      ],
+      "size": [
+        320,
+        134
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "auth",
+        "Node name for S&R": "KlingDirect_Auth"
+      },
+      "widgets_values": [
+        "",
+        "",
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "KlingDirect_CameraPreset",
+      "pos": [
+        50,
+        214
+      ],
+      "size": [
+        320,
+        114
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "camera_control",
+          "type": "KLING_CAMERA",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "camera",
+        "Node name for S&R": "KlingDirect_CameraPreset"
+      },
+      "widgets_values": [
+        "orbit_left",
+        1.0
+      ]
+    },
+    {
+      "id": 3,
+      "type": "KlingDirect_TextToVideo",
+      "pos": [
+        430,
+        50
+      ],
+      "size": [
+        320,
+        310
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 1
+        },
+        {
+          "name": "camera_control",
+          "type": "KLING_CAMERA",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "IMAGE",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "video_file",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "url",
+          "type": "STRING",
+          "links": [
+            3
+          ],
+          "slot_index": 3
+        },
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "recipe_id": "t2v",
+        "Node name for S&R": "KlingDirect_TextToVideo"
+      },
+      "widgets_values": [
+        "A character standing in a sunlit meadow, wildflowers everywhere, golden afternoon light",
+        "blurry, shaky",
+        "kling-v3",
+        "16:9",
+        "5",
+        "pro",
+        true,
+        0.5,
+        "medium_shot"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "KlingDirect_FastVideoSaver",
+      "pos": [
+        810,
+        50
+      ],
+      "size": [
+        320,
+        128
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "url",
+          "type": "STRING",
+          "link": 3,
+          "widget": {
+            "name": "url"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "file_path",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "filename",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "saver",
+        "Node name for S&R": "KlingDirect_FastVideoSaver"
+      },
+      "widgets_values": [
+        "kling_camera_preset"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      3,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      1,
+      "KLING_CAMERA"
+    ],
+    [
+      3,
+      3,
+      3,
+      4,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Setup",
+      "bounding": [
+        30,
+        0,
+        360,
+        348
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Action",
+      "bounding": [
+        410,
+        0,
+        360,
+        380
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        790,
+        0,
+        360,
+        198
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "description": "Add a cinematic camera movement to text-to-video: pick a preset (orbit, dolly, pan, etc.) and it wires into T2V automatically.",
+    "title": "Kling \u2014 Camera Preset",
+    "tier": 1,
+    "pack": "ComfyUI-Kling-Direct"
+  },
+  "version": 0.4
+}
