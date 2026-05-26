@@ -1,0 +1,462 @@
+{
+  "last_node_id": 7,
+  "last_link_id": 6,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "KlingDirect_Auth",
+      "pos": [
+        50,
+        50
+      ],
+      "size": [
+        320,
+        134
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "auth",
+        "Node name for S&R": "KlingDirect_Auth"
+      },
+      "widgets_values": [
+        "",
+        "",
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        50,
+        214
+      ],
+      "size": [
+        320,
+        108
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "start_img",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        50,
+        352
+      ],
+      "size": [
+        320,
+        108
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "end_img",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "KlingDirect_KeyframeVideo",
+      "pos": [
+        430,
+        50
+      ],
+      "size": [
+        320,
+        250
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 1
+        },
+        {
+          "name": "start_image",
+          "type": "IMAGE",
+          "link": 3
+        },
+        {
+          "name": "end_image",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "name": "camera_control",
+          "type": "KLING_CAMERA",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "IMAGE",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "video_file",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "url",
+          "type": "STRING",
+          "links": [
+            5
+          ],
+          "slot_index": 3
+        },
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "recipe_id": "keyframe_vid",
+        "Node name for S&R": "KlingDirect_KeyframeVideo"
+      },
+      "widgets_values": [
+        "A seamless cinematic transition between the two scenes, smooth camera movement",
+        "abrupt cut, jitter, blur",
+        "kling-v1-6",
+        "10",
+        "pro",
+        0.5
+      ]
+    },
+    {
+      "id": 5,
+      "type": "KlingDirect_AudioGenerate",
+      "pos": [
+        430,
+        330
+      ],
+      "size": [
+        320,
+        156
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "audio_file",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "url",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        }
+      ],
+      "properties": {
+        "recipe_id": "music",
+        "Node name for S&R": "KlingDirect_AudioGenerate"
+      },
+      "widgets_values": [
+        "Cinematic orchestral transition music, rising strings, emotional, 30 seconds",
+        30
+      ]
+    },
+    {
+      "id": 6,
+      "type": "KlingDirect_FastVideoSaver",
+      "pos": [
+        810,
+        50
+      ],
+      "size": [
+        320,
+        128
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "url",
+          "type": "STRING",
+          "link": 5,
+          "widget": {
+            "name": "url"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "file_path",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "filename",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "saver",
+        "Node name for S&R": "KlingDirect_FastVideoSaver"
+      },
+      "widgets_values": [
+        "kling_keyframe"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "PreviewAudio",
+      "pos": [
+        810,
+        208
+      ],
+      "size": [
+        320,
+        74
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 6
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "recipe_id": "music_out",
+        "Node name for S&R": "PreviewAudio"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      4,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      2,
+      1,
+      0,
+      5,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      3,
+      2,
+      0,
+      4,
+      1,
+      "IMAGE"
+    ],
+    [
+      4,
+      3,
+      0,
+      4,
+      2,
+      "IMAGE"
+    ],
+    [
+      5,
+      4,
+      3,
+      6,
+      0,
+      "STRING"
+    ],
+    [
+      6,
+      5,
+      0,
+      7,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Setup",
+      "bounding": [
+        30,
+        0,
+        360,
+        204
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Keyframes",
+      "bounding": [
+        30,
+        164,
+        360,
+        316
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Video",
+      "bounding": [
+        410,
+        0,
+        360,
+        320
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Music",
+      "bounding": [
+        410,
+        280,
+        360,
+        226
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        790,
+        0,
+        360,
+        302
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "description": "Load two images as start and end keyframes, generate a smooth morph video with KeyframeVideo, and compose background audio in parallel.",
+    "title": "Kling \u2014 Keyframe Animation",
+    "tier": 2,
+    "pack": "ComfyUI-Kling-Direct"
+  },
+  "version": 0.4
+}

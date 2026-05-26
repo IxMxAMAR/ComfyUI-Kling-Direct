@@ -1,0 +1,443 @@
+{
+  "last_node_id": 6,
+  "last_link_id": 6,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "KlingDirect_Auth",
+      "pos": [
+        50,
+        50
+      ],
+      "size": [
+        320,
+        134
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "links": [
+            1,
+            2,
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "auth",
+        "Node name for S&R": "KlingDirect_Auth"
+      },
+      "widgets_values": [
+        "",
+        "",
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "KlingDirect_ImageGen",
+      "pos": [
+        430,
+        50
+      ],
+      "size": [
+        320,
+        242
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "url",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "recipe_id": "img",
+        "Node name for S&R": "KlingDirect_ImageGen"
+      },
+      "widgets_values": [
+        "A cyberpunk musician performing on a neon-lit stage, rain pouring, smoke machines, cinematic",
+        "blurry, low quality, watermark",
+        "kling-v2-master",
+        "16:9",
+        "1080p",
+        0.5,
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "type": "KlingDirect_ImageToVideo",
+      "pos": [
+        810,
+        50
+      ],
+      "size": [
+        320,
+        270
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 2
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "name": "image_tail",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "camera_control",
+          "type": "KLING_CAMERA",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "IMAGE",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "video_file",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "url",
+          "type": "STRING",
+          "links": [
+            5
+          ],
+          "slot_index": 3
+        },
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        }
+      ],
+      "properties": {
+        "recipe_id": "vid",
+        "Node name for S&R": "KlingDirect_ImageToVideo"
+      },
+      "widgets_values": [
+        "Camera slowly pushes in as the musician plays, lights pulsing to the beat, rain catching the light",
+        "jerky motion, blur",
+        "kling-v3",
+        "5",
+        "pro",
+        false,
+        0.5
+      ]
+    },
+    {
+      "id": 4,
+      "type": "KlingDirect_AudioGenerate",
+      "pos": [
+        810,
+        350
+      ],
+      "size": [
+        320,
+        156
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "auth",
+          "type": "KLING_AUTH",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "audio_file",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "url",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "task_id",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        }
+      ],
+      "properties": {
+        "recipe_id": "music",
+        "Node name for S&R": "KlingDirect_AudioGenerate"
+      },
+      "widgets_values": [
+        "Cyberpunk electronic music, synthwave, driving beat, dramatic, energetic, 30 seconds",
+        30
+      ]
+    },
+    {
+      "id": 5,
+      "type": "KlingDirect_FastVideoSaver",
+      "pos": [
+        1190,
+        50
+      ],
+      "size": [
+        320,
+        128
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "url",
+          "type": "STRING",
+          "link": 5,
+          "widget": {
+            "name": "url"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "file_path",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        },
+        {
+          "name": "filename",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "recipe_id": "saver",
+        "Node name for S&R": "KlingDirect_FastVideoSaver"
+      },
+      "widgets_values": [
+        "kling_music_video"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "PreviewAudio",
+      "pos": [
+        1190,
+        208
+      ],
+      "size": [
+        320,
+        74
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 6
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "recipe_id": "music_out",
+        "Node name for S&R": "PreviewAudio"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      2,
+      1,
+      0,
+      3,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      3,
+      1,
+      0,
+      4,
+      0,
+      "KLING_AUTH"
+    ],
+    [
+      4,
+      2,
+      0,
+      3,
+      1,
+      "IMAGE"
+    ],
+    [
+      5,
+      3,
+      3,
+      5,
+      0,
+      "STRING"
+    ],
+    [
+      6,
+      4,
+      0,
+      6,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Setup",
+      "bounding": [
+        30,
+        0,
+        360,
+        204
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Image",
+      "bounding": [
+        410,
+        0,
+        360,
+        312
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Video",
+      "bounding": [
+        790,
+        0,
+        360,
+        340
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Music",
+      "bounding": [
+        790,
+        300,
+        360,
+        226
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Output",
+      "bounding": [
+        1170,
+        0,
+        360,
+        302
+      ],
+      "color": "#3F789E",
+      "font_size": 24,
+      "locked": false
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "description": "Generate a hero image, animate it to video, and compose background audio in parallel. Both are produced from a single creative prompt.",
+    "title": "Kling \u2014 Music Video Pipeline",
+    "tier": 2,
+    "pack": "ComfyUI-Kling-Direct"
+  },
+  "version": 0.4
+}
