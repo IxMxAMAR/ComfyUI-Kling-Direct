@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -43,11 +43,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        258
+        246
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 2,
@@ -82,11 +82,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        430
+        404
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 3,
@@ -125,7 +125,7 @@
       ],
       "size": [
         320,
-        344
+        368
       ],
       "flags": {},
       "order": 4,
@@ -204,11 +204,11 @@
       "type": "KlingDirect_AudioGenerate",
       "pos": [
         460,
-        454
+        478
       ],
       "size": [
         320,
-        238
+        252
       ],
       "flags": {},
       "order": 5,
@@ -266,7 +266,7 @@
       ],
       "size": [
         320,
-        144
+        132
       ],
       "flags": {},
       "order": 6,
@@ -300,6 +300,7 @@
         "Node name for S&R": "KlingDirect_FastVideoSaver"
       },
       "widgets_values": [
+        "",
         "kling_keyframe"
       ]
     },
@@ -308,11 +309,11 @@
       "type": "PreviewAudio",
       "pos": [
         860,
-        254
+        242
       ],
       "size": [
         320,
-        82
+        56
       ],
       "flags": {},
       "order": 7,
@@ -389,7 +390,7 @@
         35,
         -1,
         370,
-        234
+        222
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -399,9 +400,9 @@
       "title": "Keyframes",
       "bounding": [
         35,
-        197,
+        185,
         370,
-        380
+        352
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -413,7 +414,7 @@
         435,
         -1,
         370,
-        430
+        454
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -423,9 +424,9 @@
       "title": "Music",
       "bounding": [
         435,
-        393,
+        417,
         370,
-        324
+        338
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -437,7 +438,7 @@
         835,
         -1,
         370,
-        362
+        324
       ],
       "color": "#3F789E",
       "font_size": 24,

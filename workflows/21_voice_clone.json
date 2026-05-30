@@ -1,6 +1,6 @@
 {
-  "last_node_id": 3,
-  "last_link_id": 2,
+  "last_node_id": 4,
+  "last_link_id": 3,
   "nodes": [
     {
       "id": 1,
@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -42,11 +42,11 @@
       "type": "LoadAudio",
       "pos": [
         60,
-        258
+        246
       ],
       "size": [
         320,
-        104
+        88
       ],
       "flags": {},
       "order": 2,
@@ -79,7 +79,7 @@
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 3,
@@ -100,13 +100,55 @@
         {
           "name": "voice_id",
           "type": "STRING",
-          "links": [],
+          "links": [
+            3
+          ],
           "slot_index": 0
         }
       ],
       "properties": {
         "recipe_id": "clone",
         "Node name for S&R": "KlingDirect_VoiceClone"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "ShowText|pysssss",
+      "pos": [
+        860,
+        60
+      ],
+      "size": [
+        320,
+        88
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 3,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "out",
+        "Node name for S&R": "ShowText|pysssss"
       },
       "widgets_values": [
         ""
@@ -129,6 +171,14 @@
       3,
       1,
       "AUDIO"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "STRING"
     ]
   ],
   "groups": [
@@ -138,7 +188,7 @@
         35,
         -1,
         370,
-        388
+        360
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -150,7 +200,7 @@
         435,
         -1,
         370,
-        208
+        194
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -162,7 +212,7 @@
         835,
         -1,
         370,
-        190
+        174
       ],
       "color": "#3F789E",
       "font_size": 24,

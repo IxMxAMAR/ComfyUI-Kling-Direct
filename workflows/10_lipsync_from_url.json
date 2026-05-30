@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -46,7 +46,7 @@
       ],
       "size": [
         320,
-        198
+        192
       ],
       "flags": {},
       "order": 2,
@@ -110,7 +110,7 @@
       ],
       "size": [
         320,
-        144
+        132
       ],
       "flags": {},
       "order": 3,
@@ -144,6 +144,7 @@
         "Node name for S&R": "KlingDirect_FastVideoSaver"
       },
       "widgets_values": [
+        "",
         "kling_lipsync_url"
       ]
     }
@@ -173,7 +174,7 @@
         35,
         -1,
         370,
-        234
+        222
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -185,7 +186,7 @@
         435,
         -1,
         370,
-        284
+        278
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -197,7 +198,7 @@
         835,
         -1,
         370,
-        230
+        218
       ],
       "color": "#3F789E",
       "font_size": 24,

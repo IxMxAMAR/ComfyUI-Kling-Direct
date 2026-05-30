@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -46,7 +46,7 @@
       ],
       "size": [
         320,
-        140
+        128
       ],
       "flags": {},
       "order": 2,
@@ -79,7 +79,7 @@
         "Node name for S&R": "KlingDirect_VideoLoader"
       },
       "widgets_values": [
-        "example.mp4"
+        "robot_unitree.mp4"
       ]
     },
     {
@@ -91,7 +91,7 @@
       ],
       "size": [
         320,
-        210
+        204
       ],
       "flags": {},
       "order": 3,
@@ -135,11 +135,11 @@
       "type": "LoadAudio",
       "pos": [
         460,
-        250
+        238
       ],
       "size": [
         320,
-        104
+        88
       ],
       "flags": {},
       "order": 4,
@@ -168,11 +168,11 @@
       "type": "KlingDirect_CloudUploader",
       "pos": [
         860,
-        320
+        314
       ],
       "size": [
         320,
-        210
+        204
       ],
       "flags": {},
       "order": 5,
@@ -220,7 +220,7 @@
       ],
       "size": [
         320,
-        242
+        240
       ],
       "flags": {},
       "order": 6,
@@ -287,6 +287,8 @@
         "Node name for S&R": "KlingDirect_AdvancedLipSync"
       },
       "widgets_values": [
+        "",
+        "",
         0,
         100
       ]
@@ -300,7 +302,7 @@
       ],
       "size": [
         320,
-        144
+        132
       ],
       "flags": {},
       "order": 7,
@@ -334,6 +336,7 @@
         "Node name for S&R": "KlingDirect_FastVideoSaver"
       },
       "widgets_values": [
+        "",
         "kling_lipsync"
       ]
     }
@@ -395,7 +398,7 @@
         35,
         -1,
         370,
-        234
+        222
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -407,7 +410,7 @@
         435,
         -1,
         770,
-        296
+        290
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -417,7 +420,7 @@
       "title": "Audio In",
       "bounding": [
         435,
-        189,
+        177,
         770,
         366
       ],
@@ -431,7 +434,7 @@
         1235,
         -1,
         370,
-        328
+        326
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -443,7 +446,7 @@
         1635,
         -1,
         370,
-        230
+        218
       ],
       "color": "#3F789E",
       "font_size": 24,

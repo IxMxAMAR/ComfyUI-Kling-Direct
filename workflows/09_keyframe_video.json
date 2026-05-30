@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -42,11 +42,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        258
+        246
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 2,
@@ -81,11 +81,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        430
+        404
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 3,
@@ -124,7 +124,7 @@
       ],
       "size": [
         320,
-        344
+        368
       ],
       "flags": {},
       "order": 4,
@@ -207,7 +207,7 @@
       ],
       "size": [
         320,
-        144
+        132
       ],
       "flags": {},
       "order": 5,
@@ -241,6 +241,7 @@
         "Node name for S&R": "KlingDirect_FastVideoSaver"
       },
       "widgets_values": [
+        "",
         "kling_keyframe"
       ]
     }
@@ -286,7 +287,7 @@
         35,
         -1,
         370,
-        578
+        538
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -298,7 +299,7 @@
         435,
         -1,
         370,
-        430
+        454
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -310,7 +311,7 @@
         835,
         -1,
         370,
-        230
+        218
       ],
       "color": "#3F789E",
       "font_size": 24,

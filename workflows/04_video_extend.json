@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -47,7 +47,7 @@
       ],
       "size": [
         320,
-        410
+        440
       ],
       "flags": {},
       "order": 2,
@@ -123,7 +123,7 @@
       ],
       "size": [
         320,
-        300
+        320
       ],
       "flags": {},
       "order": 3,
@@ -187,6 +187,7 @@
         "Node name for S&R": "KlingDirect_VideoExtend"
       },
       "widgets_values": [
+        "",
         "Continue the scene \u2014 the lighthouse beam sweeps across the dark water",
         "",
         0.5
@@ -201,7 +202,7 @@
       ],
       "size": [
         320,
-        144
+        132
       ],
       "flags": {},
       "order": 4,
@@ -235,6 +236,7 @@
         "Node name for S&R": "KlingDirect_FastVideoSaver"
       },
       "widgets_values": [
+        "",
         "kling_extended"
       ]
     }
@@ -280,7 +282,7 @@
         35,
         -1,
         370,
-        234
+        222
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -292,7 +294,7 @@
         435,
         -1,
         770,
-        496
+        526
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -304,7 +306,7 @@
         1235,
         -1,
         370,
-        230
+        218
       ],
       "color": "#3F789E",
       "font_size": 24,

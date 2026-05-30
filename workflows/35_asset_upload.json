@@ -1,6 +1,6 @@
 {
-  "last_node_id": 3,
-  "last_link_id": 2,
+  "last_node_id": 4,
+  "last_link_id": 3,
   "nodes": [
     {
       "id": 1,
@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -42,11 +42,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        258
+        246
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 2,
@@ -85,7 +85,7 @@
       ],
       "size": [
         320,
-        166
+        156
       ],
       "flags": {},
       "order": 3,
@@ -106,7 +106,9 @@
         {
           "name": "asset_id",
           "type": "STRING",
-          "links": [],
+          "links": [
+            3
+          ],
           "slot_index": 0
         },
         {
@@ -123,6 +125,46 @@
       "widgets_values": [
         "image",
         "",
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "ShowText|pysssss",
+      "pos": [
+        860,
+        60
+      ],
+      "size": [
+        320,
+        88
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 3,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "recipe_id": "out",
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
         ""
       ]
     }
@@ -143,6 +185,14 @@
       3,
       1,
       "IMAGE"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "STRING"
     ]
   ],
   "groups": [
@@ -152,7 +202,7 @@
         35,
         -1,
         370,
-        406
+        380
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -164,7 +214,7 @@
         435,
         -1,
         370,
-        252
+        242
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -176,7 +226,7 @@
         835,
         -1,
         370,
-        190
+        174
       ],
       "color": "#3F789E",
       "font_size": 24,

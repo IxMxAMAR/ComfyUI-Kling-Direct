@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        148
+        136
       ],
       "flags": {},
       "order": 1,
@@ -44,11 +44,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        258
+        246
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 2,
@@ -85,11 +85,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        430
+        404
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 3,
@@ -124,11 +124,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        602
+        562
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 4,
@@ -163,11 +163,11 @@
       "type": "LoadImage",
       "pos": [
         60,
-        774
+        720
       ],
       "size": [
         320,
-        122
+        108
       ],
       "flags": {},
       "order": 5,
@@ -206,7 +206,7 @@
       ],
       "size": [
         320,
-        140
+        128
       ],
       "flags": {},
       "order": 6,
@@ -255,7 +255,7 @@
         "Node name for S&R": "KlingDirect_VirtualTryOn"
       },
       "widgets_values": [
-        "kolors-virtual-try-on-v1-5"
+        "kolors-virtual-try-on-v1"
       ]
     },
     {
@@ -267,7 +267,7 @@
       ],
       "size": [
         320,
-        82
+        56
       ],
       "flags": {},
       "order": 7,
@@ -291,11 +291,11 @@
       "type": "KlingDirect_VirtualTryOn",
       "pos": [
         460,
-        250
+        238
       ],
       "size": [
         320,
-        140
+        128
       ],
       "flags": {},
       "order": 8,
@@ -344,7 +344,7 @@
         "Node name for S&R": "KlingDirect_VirtualTryOn"
       },
       "widgets_values": [
-        "kolors-virtual-try-on-v1-5"
+        "kolors-virtual-try-on-v1"
       ]
     },
     {
@@ -352,11 +352,11 @@
       "type": "PreviewImage",
       "pos": [
         860,
-        192
+        166
       ],
       "size": [
         320,
-        82
+        56
       ],
       "flags": {},
       "order": 9,
@@ -380,11 +380,11 @@
       "type": "KlingDirect_VirtualTryOn",
       "pos": [
         460,
-        440
+        416
       ],
       "size": [
         320,
-        140
+        128
       ],
       "flags": {},
       "order": 10,
@@ -433,7 +433,7 @@
         "Node name for S&R": "KlingDirect_VirtualTryOn"
       },
       "widgets_values": [
-        "kolors-virtual-try-on-v1-5"
+        "kolors-virtual-try-on-v1"
       ]
     },
     {
@@ -441,11 +441,11 @@
       "type": "PreviewImage",
       "pos": [
         860,
-        324
+        272
       ],
       "size": [
         320,
-        82
+        56
       ],
       "flags": {},
       "order": 11,
@@ -570,7 +570,7 @@
         35,
         -1,
         370,
-        234
+        222
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -580,9 +580,9 @@
       "title": "Person",
       "bounding": [
         35,
-        197,
+        185,
         370,
-        208
+        194
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -592,9 +592,9 @@
       "title": "Garments",
       "bounding": [
         35,
-        369,
+        343,
         370,
-        552
+        510
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -606,7 +606,7 @@
         435,
         -1,
         770,
-        226
+        214
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -616,9 +616,9 @@
       "title": "Try-On 2",
       "bounding": [
         435,
-        131,
+        105,
         770,
-        284
+        286
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -628,9 +628,9 @@
       "title": "Try-On 3",
       "bounding": [
         435,
-        263,
+        211,
         770,
-        342
+        358
       ],
       "color": "#3F789E",
       "font_size": 24,
