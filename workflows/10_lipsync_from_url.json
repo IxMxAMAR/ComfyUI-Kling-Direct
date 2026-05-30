@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -41,12 +41,12 @@
       "id": 2,
       "type": "KlingDirect_LipSyncFromUrl",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        170
+        198
       ],
       "flags": {},
       "order": 2,
@@ -105,12 +105,12 @@
       "id": 3,
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        128
+        144
       ],
       "flags": {},
       "order": 3,
@@ -170,10 +170,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        204
+        35,
+        -1,
+        370,
+        234
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -182,10 +182,10 @@
     {
       "title": "Action",
       "bounding": [
-        410,
-        0,
-        360,
-        240
+        435,
+        -1,
+        370,
+        284
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -194,10 +194,10 @@
     {
       "title": "Output",
       "bounding": [
-        790,
-        0,
-        360,
-        198
+        835,
+        -1,
+        370,
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,

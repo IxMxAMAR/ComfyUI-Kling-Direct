@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -41,12 +41,12 @@
       "id": 2,
       "type": "KlingDirect_VoiceSelector",
       "pos": [
-        50,
-        214
+        60,
+        258
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 2,
@@ -80,12 +80,12 @@
       "id": 3,
       "type": "KlingDirect_TTS",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        196
+        282
       ],
       "flags": {},
       "order": 3,
@@ -147,12 +147,12 @@
       "id": 4,
       "type": "PreviewAudio",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        74
+        82
       ],
       "flags": {},
       "order": 4,
@@ -202,10 +202,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        342
+        35,
+        -1,
+        370,
+        406
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -214,10 +214,10 @@
     {
       "title": "Action",
       "bounding": [
-        410,
-        0,
-        360,
-        266
+        435,
+        -1,
+        370,
+        368
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -226,10 +226,10 @@
     {
       "title": "Output",
       "bounding": [
-        790,
-        0,
-        360,
-        144
+        835,
+        -1,
+        370,
+        168
       ],
       "color": "#3F789E",
       "font_size": 24,

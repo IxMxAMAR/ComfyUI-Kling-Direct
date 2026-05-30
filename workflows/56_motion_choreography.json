@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -42,12 +42,12 @@
       "id": 2,
       "type": "LoadImage",
       "pos": [
-        50,
-        214
+        60,
+        258
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 2,
@@ -82,12 +82,12 @@
       "id": 3,
       "type": "KlingDirect_CameraPreset",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        114
+        126
       ],
       "flags": {},
       "order": 3,
@@ -116,12 +116,12 @@
       "id": 4,
       "type": "KlingDirect_CameraPreset",
       "pos": [
-        430,
-        194
+        460,
+        236
       ],
       "size": [
         320,
-        114
+        126
       ],
       "flags": {},
       "order": 4,
@@ -150,12 +150,12 @@
       "id": 5,
       "type": "KlingDirect_ImageToVideo",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        270
+        366
       ],
       "flags": {},
       "order": 5,
@@ -234,12 +234,12 @@
       "id": 6,
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
-        1190,
-        50
+        1260,
+        60
       ],
       "size": [
         320,
-        128
+        144
       ],
       "flags": {},
       "order": 6,
@@ -280,12 +280,12 @@
       "id": 7,
       "type": "KlingDirect_ImageToVideo",
       "pos": [
-        810,
-        350
+        860,
+        476
       ],
       "size": [
         320,
-        270
+        366
       ],
       "flags": {},
       "order": 7,
@@ -364,12 +364,12 @@
       "id": 8,
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
-        1190,
-        208
+        1260,
+        254
       ],
       "size": [
         320,
-        128
+        144
       ],
       "flags": {},
       "order": 8,
@@ -477,10 +477,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        204
+        35,
+        -1,
+        370,
+        234
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -489,10 +489,10 @@
     {
       "title": "Source",
       "bounding": [
-        30,
-        164,
-        360,
-        178
+        35,
+        197,
+        370,
+        208
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -501,10 +501,10 @@
     {
       "title": "Camera A",
       "bounding": [
-        410,
-        0,
-        360,
-        184
+        435,
+        -1,
+        370,
+        212
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -513,10 +513,10 @@
     {
       "title": "Camera B",
       "bounding": [
-        410,
-        144,
-        360,
-        184
+        435,
+        175,
+        370,
+        212
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -525,10 +525,10 @@
     {
       "title": "Video A",
       "bounding": [
-        790,
-        0,
-        740,
-        340
+        835,
+        -1,
+        770,
+        452
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -537,10 +537,10 @@
     {
       "title": "Video B",
       "bounding": [
-        790,
-        158,
-        740,
-        482
+        835,
+        193,
+        770,
+        674
       ],
       "color": "#3F789E",
       "font_size": 24,

@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -41,12 +41,12 @@
       "id": 2,
       "type": "LoadImage",
       "pos": [
-        50,
-        214
+        60,
+        258
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 2,
@@ -80,12 +80,12 @@
       "id": 3,
       "type": "LoadImage",
       "pos": [
-        50,
-        352
+        60,
+        430
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 3,
@@ -119,12 +119,12 @@
       "id": 4,
       "type": "KlingDirect_KeyframeVideo",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        250
+        344
       ],
       "flags": {},
       "order": 4,
@@ -202,12 +202,12 @@
       "id": 5,
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        128
+        144
       ],
       "flags": {},
       "order": 5,
@@ -283,10 +283,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        480
+        35,
+        -1,
+        370,
+        578
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -295,10 +295,10 @@
     {
       "title": "Action",
       "bounding": [
-        410,
-        0,
-        360,
-        320
+        435,
+        -1,
+        370,
+        430
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -307,10 +307,10 @@
     {
       "title": "Output",
       "bounding": [
-        790,
-        0,
-        360,
-        198
+        835,
+        -1,
+        370,
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,

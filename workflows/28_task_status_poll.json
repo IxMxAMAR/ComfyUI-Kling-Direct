@@ -1,17 +1,17 @@
 {
-  "last_node_id": 4,
-  "last_link_id": 4,
+  "last_node_id": 3,
+  "last_link_id": 3,
   "nodes": [
     {
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -42,12 +42,12 @@
       "id": 2,
       "type": "KlingDirect_TextToVideo",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        310
+        410
       ],
       "flags": {},
       "order": 2,
@@ -118,12 +118,12 @@
       "id": 3,
       "type": "KlingDirect_TaskStatus",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        142
+        162
       ],
       "flags": {},
       "order": 3,
@@ -153,9 +153,7 @@
         {
           "name": "result_json",
           "type": "STRING",
-          "links": [
-            4
-          ],
+          "links": [],
           "slot_index": 1
         },
         {
@@ -172,44 +170,6 @@
       "widgets_values": [
         "/v1/videos/text2video"
       ]
-    },
-    {
-      "id": 4,
-      "type": "ShowText",
-      "pos": [
-        1190,
-        50
-      ],
-      "size": [
-        320,
-        94
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "text",
-          "type": "STRING",
-          "link": 4,
-          "widget": {
-            "name": "text"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "text",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "recipe_id": "out",
-        "Node name for S&R": "ShowText"
-      },
-      "widgets_values": []
     }
   ],
   "links": [
@@ -236,24 +196,16 @@
       3,
       1,
       "STRING"
-    ],
-    [
-      4,
-      3,
-      1,
-      4,
-      0,
-      "STRING"
     ]
   ],
   "groups": [
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        204
+        35,
+        -1,
+        370,
+        234
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -262,10 +214,10 @@
     {
       "title": "Generate",
       "bounding": [
-        410,
-        0,
-        360,
-        380
+        435,
+        -1,
+        370,
+        496
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -274,10 +226,10 @@
     {
       "title": "Poll",
       "bounding": [
-        790,
-        0,
-        360,
-        212
+        835,
+        -1,
+        370,
+        248
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -286,10 +238,10 @@
     {
       "title": "Output",
       "bounding": [
-        1170,
-        0,
-        360,
-        164
+        1235,
+        -1,
+        370,
+        190
       ],
       "color": "#3F789E",
       "font_size": 24,

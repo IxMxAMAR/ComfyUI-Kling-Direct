@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -43,12 +43,12 @@
       "id": 2,
       "type": "LoadImage",
       "pos": [
-        50,
-        214
+        60,
+        258
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 2,
@@ -84,12 +84,12 @@
       "id": 3,
       "type": "LoadImage",
       "pos": [
-        50,
-        352
+        60,
+        430
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 3,
@@ -123,12 +123,12 @@
       "id": 4,
       "type": "LoadImage",
       "pos": [
-        50,
-        490
+        60,
+        602
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 4,
@@ -162,12 +162,12 @@
       "id": 5,
       "type": "LoadImage",
       "pos": [
-        50,
-        628
+        60,
+        774
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 5,
@@ -201,12 +201,12 @@
       "id": 6,
       "type": "KlingDirect_VirtualTryOn",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        122
+        140
       ],
       "flags": {},
       "order": 6,
@@ -262,12 +262,12 @@
       "id": 7,
       "type": "PreviewImage",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        74
+        82
       ],
       "flags": {},
       "order": 7,
@@ -290,12 +290,12 @@
       "id": 8,
       "type": "KlingDirect_VirtualTryOn",
       "pos": [
-        430,
-        202
+        460,
+        250
       ],
       "size": [
         320,
-        122
+        140
       ],
       "flags": {},
       "order": 8,
@@ -351,12 +351,12 @@
       "id": 9,
       "type": "PreviewImage",
       "pos": [
-        810,
-        154
+        860,
+        192
       ],
       "size": [
         320,
-        74
+        82
       ],
       "flags": {},
       "order": 9,
@@ -379,12 +379,12 @@
       "id": 10,
       "type": "KlingDirect_VirtualTryOn",
       "pos": [
-        430,
-        354
+        460,
+        440
       ],
       "size": [
         320,
-        122
+        140
       ],
       "flags": {},
       "order": 10,
@@ -440,12 +440,12 @@
       "id": 11,
       "type": "PreviewImage",
       "pos": [
-        810,
-        258
+        860,
+        324
       ],
       "size": [
         320,
-        74
+        82
       ],
       "flags": {},
       "order": 11,
@@ -567,10 +567,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        204
+        35,
+        -1,
+        370,
+        234
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -579,10 +579,10 @@
     {
       "title": "Person",
       "bounding": [
-        30,
-        164,
-        360,
-        178
+        35,
+        197,
+        370,
+        208
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -591,10 +591,10 @@
     {
       "title": "Garments",
       "bounding": [
-        30,
-        302,
-        360,
-        454
+        35,
+        369,
+        370,
+        552
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -603,10 +603,10 @@
     {
       "title": "Try-On 1",
       "bounding": [
-        410,
-        0,
-        740,
-        192
+        435,
+        -1,
+        770,
+        226
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -615,10 +615,10 @@
     {
       "title": "Try-On 2",
       "bounding": [
-        410,
-        104,
-        740,
-        240
+        435,
+        131,
+        770,
+        284
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -627,10 +627,10 @@
     {
       "title": "Try-On 3",
       "bounding": [
-        410,
-        208,
-        740,
-        288
+        435,
+        263,
+        770,
+        342
       ],
       "color": "#3F789E",
       "font_size": 24,

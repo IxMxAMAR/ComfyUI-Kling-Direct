@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -43,12 +43,12 @@
       "id": 2,
       "type": "KlingDirect_ImageGen",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        242
+        330
       ],
       "flags": {},
       "order": 2,
@@ -100,12 +100,12 @@
       "id": 3,
       "type": "KlingDirect_ImageToVideo",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        270
+        366
       ],
       "flags": {},
       "order": 3,
@@ -184,12 +184,12 @@
       "id": 4,
       "type": "KlingDirect_AudioGenerate",
       "pos": [
-        810,
-        350
+        860,
+        476
       ],
       "size": [
         320,
-        156
+        238
       ],
       "flags": {},
       "order": 4,
@@ -242,12 +242,12 @@
       "id": 5,
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
-        1190,
-        50
+        1260,
+        60
       ],
       "size": [
         320,
-        128
+        144
       ],
       "flags": {},
       "order": 5,
@@ -288,12 +288,12 @@
       "id": 6,
       "type": "PreviewAudio",
       "pos": [
-        1190,
-        208
+        1260,
+        254
       ],
       "size": [
         320,
-        74
+        82
       ],
       "flags": {},
       "order": 6,
@@ -367,10 +367,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        204
+        35,
+        -1,
+        370,
+        234
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -379,10 +379,10 @@
     {
       "title": "Image",
       "bounding": [
-        410,
-        0,
-        360,
-        312
+        435,
+        -1,
+        370,
+        416
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -391,10 +391,10 @@
     {
       "title": "Video",
       "bounding": [
-        790,
-        0,
-        360,
-        340
+        835,
+        -1,
+        370,
+        452
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -403,10 +403,10 @@
     {
       "title": "Music",
       "bounding": [
-        790,
-        300,
-        360,
-        226
+        835,
+        415,
+        370,
+        324
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -415,10 +415,10 @@
     {
       "title": "Output",
       "bounding": [
-        1170,
-        0,
-        360,
-        302
+        1235,
+        -1,
+        370,
+        362
       ],
       "color": "#3F789E",
       "font_size": 24,

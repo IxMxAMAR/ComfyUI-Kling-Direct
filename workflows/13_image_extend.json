@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -42,12 +42,12 @@
       "id": 2,
       "type": "LoadImage",
       "pos": [
-        50,
-        214
+        60,
+        258
       ],
       "size": [
         320,
-        108
+        122
       ],
       "flags": {},
       "order": 2,
@@ -81,12 +81,12 @@
       "id": 3,
       "type": "KlingDirect_AssetUpload",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        148
+        166
       ],
       "flags": {},
       "order": 3,
@@ -133,12 +133,12 @@
       "id": 4,
       "type": "KlingDirect_ImageExtend",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        162
+        242
       ],
       "flags": {},
       "order": 4,
@@ -198,12 +198,12 @@
       "id": 5,
       "type": "PreviewImage",
       "pos": [
-        1190,
-        50
+        1260,
+        60
       ],
       "size": [
         320,
-        74
+        82
       ],
       "flags": {},
       "order": 5,
@@ -269,10 +269,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        342
+        35,
+        -1,
+        370,
+        406
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -281,10 +281,10 @@
     {
       "title": "Upload",
       "bounding": [
-        410,
-        0,
-        360,
-        218
+        435,
+        -1,
+        370,
+        252
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -293,10 +293,10 @@
     {
       "title": "Action",
       "bounding": [
-        790,
-        0,
-        360,
-        232
+        835,
+        -1,
+        370,
+        328
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -305,10 +305,10 @@
     {
       "title": "Output",
       "bounding": [
-        1170,
-        0,
-        360,
-        144
+        1235,
+        -1,
+        370,
+        168
       ],
       "color": "#3F789E",
       "font_size": 24,

@@ -6,12 +6,12 @@
       "id": 1,
       "type": "KlingDirect_Auth",
       "pos": [
-        50,
-        50
+        60,
+        60
       ],
       "size": [
         320,
-        134
+        148
       ],
       "flags": {},
       "order": 1,
@@ -41,12 +41,12 @@
       "id": 2,
       "type": "KlingDirect_VideoLoader",
       "pos": [
-        430,
-        50
+        460,
+        60
       ],
       "size": [
         320,
-        122
+        140
       ],
       "flags": {},
       "order": 2,
@@ -86,12 +86,12 @@
       "id": 3,
       "type": "KlingDirect_CloudUploader",
       "pos": [
-        810,
-        50
+        860,
+        60
       ],
       "size": [
         320,
-        188
+        210
       ],
       "flags": {},
       "order": 3,
@@ -134,12 +134,12 @@
       "id": 4,
       "type": "LoadAudio",
       "pos": [
-        430,
-        202
+        460,
+        250
       ],
       "size": [
         320,
-        94
+        104
       ],
       "flags": {},
       "order": 4,
@@ -167,12 +167,12 @@
       "id": 5,
       "type": "KlingDirect_CloudUploader",
       "pos": [
-        810,
-        268
+        860,
+        320
       ],
       "size": [
         320,
-        188
+        210
       ],
       "flags": {},
       "order": 5,
@@ -215,12 +215,12 @@
       "id": 6,
       "type": "KlingDirect_AdvancedLipSync",
       "pos": [
-        1190,
-        50
+        1260,
+        60
       ],
       "size": [
         320,
-        210
+        242
       ],
       "flags": {},
       "order": 6,
@@ -295,12 +295,12 @@
       "id": 7,
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
-        1570,
-        50
+        1660,
+        60
       ],
       "size": [
         320,
-        128
+        144
       ],
       "flags": {},
       "order": 7,
@@ -392,10 +392,10 @@
     {
       "title": "Setup",
       "bounding": [
-        30,
-        0,
-        360,
-        204
+        35,
+        -1,
+        370,
+        234
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -404,10 +404,10 @@
     {
       "title": "Video In",
       "bounding": [
-        410,
-        0,
-        740,
-        258
+        435,
+        -1,
+        770,
+        296
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -416,10 +416,10 @@
     {
       "title": "Audio In",
       "bounding": [
-        410,
-        152,
-        740,
-        324
+        435,
+        189,
+        770,
+        366
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -428,10 +428,10 @@
     {
       "title": "Lipsync",
       "bounding": [
-        1170,
-        0,
-        360,
-        280
+        1235,
+        -1,
+        370,
+        328
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -440,10 +440,10 @@
     {
       "title": "Output",
       "bounding": [
-        1550,
-        0,
-        360,
-        198
+        1635,
+        -1,
+        370,
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
