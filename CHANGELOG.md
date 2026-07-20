@@ -15,7 +15,7 @@ and registry version match again.
 
 ## [2.1.0] — 2026-05-17
 
-Audit + hardening release driven by two parallel Gemini Pro full-codebase reviews
+Audit + hardening release following two parallel full-codebase reviews
 (API/auth/HTTP/retries vs ComfyUI nodes/I/O/UX) plus first-party verification of
 every critical finding. Three critical security/correctness bugs, six high-impact
 fixes, ten new utility nodes, and a 49-test suite covering all hardened paths.
