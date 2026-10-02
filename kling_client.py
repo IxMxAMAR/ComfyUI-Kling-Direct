@@ -42,17 +42,17 @@ _client_cache_lock = threading.Lock()
 
 
 def get_client(access_key: str, secret_key: str, debug: bool = False,
-               base_url: str = "https://api-singapore.klingai.com") -> "KlingClient":
+               base_url: str = "https://api-singapore.klingai.com", api_key: str = "") -> "KlingClient":
     """Return a cached KlingClient for the given credentials, creating one if needed.
 
     Thread-safe (ComfyUI may invoke nodes concurrently). LRU-bounded to prevent
     unbounded growth when a workflow cycles through many credentials.
     """
-    cache_key = (access_key, secret_key, base_url)
+    cache_key = (access_key, secret_key, base_url, api_key)
     with _client_cache_lock:
         client = _client_cache.get(cache_key)
         if client is None:
-            client = KlingClient(access_key, secret_key, base_url=base_url, debug=debug)
+            client = KlingClient(access_key, secret_key, base_url=base_url, debug=debug, api_key=api_key)
             _client_cache[cache_key] = client
             # Evict oldest if over capacity. Close session to release sockets.
             while len(_client_cache) > _CLIENT_CACHE_MAX:
@@ -85,49 +85,50 @@ class KlingAPIError(RuntimeError):
 # --- Kling Error Code Mapping ---
 KLING_ERROR_MAP = {
     # HTTP-level
-    401: "Unauthorized: Invalid AccessKey or SecretKey. Double-check your Kling AI Authentication node.",
-    403: "Forbidden: You may have run out of credits or don't have permission for this model.",
+    401: "Unauthorized: Invalid credentials. Double-check your Kling AI Authentication node.",
+    403: "Forbidden: You may not have permission for this API or model.",
     429: "Too Many Requests: Kling API rate limit hit. Slow down or check your balance/tier.",
-    # Auth-level (1000 range)
-    1000: "Invalid Parameter: One of your inputs (prompt length, image size, etc.) is invalid.",
-    1001: "Invalid Token: Authentication token is bad. Regenerate your Kling access/secret keys.",
-    1002: "Invalid API Key: Your AccessKey is not recognized. Check your Kling dev console.",
-    1003: "Authorization Not Active: Your Kling account hasn't been activated for API access yet. "
-          "Go to https://app.klingai.com/global/dev and complete API activation/KYC. "
-          "New accounts may need approval before API calls work.",
-    1004: "Authorization Expired: Your API access has expired. Renew it in your Kling dev console.",
-    # Content/resource-level (1100 range)
-    1100: "Invalid Video Duration: Requested duration is not supported for this model.",
-    1101: "Invalid Image: Image is too large, has an unsupported aspect ratio, or failed content check.",
-    1102: "Account Balance Not Enough: Top up your Kling credits at https://app.klingai.com/global/",
-    1103: "Account Frozen: Your Kling account has been suspended. Contact Kling support.",
-    1104: "Resource Exhausted: You've hit a resource cap (concurrent tasks, daily limit, etc.).",
-    1105: "Task Not Found: The task_id you're polling doesn't exist or has expired (72 hours).",
-    1106: "Task Failed: The generation task failed on Kling's side. Try a different prompt/input.",
-    1107: "Invalid Audio: The provided audio file is too long, wrong format, or unreadable.",
-    1108: "Invalid Video: The provided video is too large, too long, or wrong format.",
-    # Server-level (1200 range)
-    1200: "Server Busy: Kling's systems are overloaded. Try again in ~60 seconds.",
-    1201: "Internal Error: Kling server hiccup. Your task may still complete in the queue.",
-    1202: "Gateway Timeout: Kling took too long to respond. Try again shortly.",
-    # Content policy (1300 range)
-    1301: "IP Banned: Your IP has been blocked. Contact Kling if this is unexpected.",
-    1302: "Content Policy Violation: Your prompt or image was flagged by Kling's safety filter.",
-    1303: "Copyright Violation: Detected content is protected/copyrighted.",
+    # Authentication
+    1000: "Authentication failed: Check that the Authorization credentials are correct.",
+    1001: "Authentication failed: Authorization is empty. Check your Kling AI Authentication node.",
+    1002: "Authentication failed: Authorization is invalid. Check your API key or access/secret keys.",
+    1003: "Authentication failed: The token is not yet valid. Check your system clock.",
+    1004: "Authentication failed: The token has expired. Reissue it.",
+    # Account
+    1100: "Account exception: Abnormal account status. Verify your account configuration.",
+    1101: "Account exception: Account in arrears. Recharge to ensure a sufficient balance.",
+    1102: "Account exception: Resource pack exhausted or expired. Purchase another resource package at https://kling.ai/dev/pricing",
+    1103: "Account exception: No permission for the requested API or model.",
+    # Invalid requests
+    1200: "Invalid request parameters: Check the request parameters.",
+    1201: "Invalid request parameters: An incorrect key or invalid value (see the message above).",
+    1202: "Invalid request: The requested method is invalid.",
+    1203: "Invalid request: The requested resource (e.g. model) does not exist.",
+    # Policy
+    1300: "Request blocked by platform policy.",
+    1301: "Content blocked: Your prompt or image triggered Kling's content security policy.",
+    1302: "Rate limit exceeded: Reduce the request frequency and try again later.",
+    1303: "Concurrency or QPS exceeds your resource package limit: Wait for running tasks to finish.",
+    1304: "Request blocked by the platform IP whitelist policy. Contact Kling support.",
+    # Server
+    5000: "Server internal error: Try again later.",
+    5001: "Server temporarily unavailable (usually maintenance): Try again later.",
+    5002: "Server internal timeout (usually a backlog): Try again later.",
 }
 
 # Non-retryable Kling error codes -- retrying won't help.
-# K-FIX v2.1: 1106 (Task Failed) moved here -- retrying just re-queries a known-failed task.
 _PERMANENT_ERROR_CODES = {
     401, 403,
     1000, 1001, 1002, 1003, 1004,
-    1100, 1101, 1102, 1103, 1105, 1106, 1107, 1108,
-    1301, 1302, 1303,
+    1100, 1101, 1102, 1103,
+    1200, 1201, 1202, 1203,
+    1300, 1301, 1304,
 }
-# Retryable Kling error codes -- transient server issues.
-_TRANSIENT_ERROR_CODES = {1104, 1200, 1201, 1202}
+# Retryable Kling error codes -- rate limits, concurrency limits and transient server issues.
+_TRANSIENT_ERROR_CODES = {1302, 1303, 5000, 5001, 5002}
 
 REQUEST_TIMEOUT = 60
+TASKS_ENDPOINT = "/tasks"
 UPLOAD_TIMEOUT = 120
 
 # JWT settings
@@ -182,9 +183,10 @@ def _parse_retry_after(value: str, fallback: float) -> float:
 class KlingClient:
     def __init__(self, access_key: str, secret_key: str,
                  base_url: str = "https://api-singapore.klingai.com",
-                 debug: bool = False):
+                 debug: bool = False, api_key: str = ""):
         self.access_key = access_key
         self.secret_key = secret_key
+        self.api_key = api_key
         self.base_url = base_url.rstrip('/')
         self.debug = debug
         # Persistent session for connection pooling -- reuses TCP connections across polling loops
@@ -245,7 +247,7 @@ class KlingClient:
     def _get_headers(self) -> Dict[str, str]:
         """Base headers for all requests."""
         return {
-            "Authorization": f"Bearer {self._generate_token()}",
+            "Authorization": f"Bearer {self.api_key or self._generate_token()}",
             "Content-Type": "application/json"
         }
 
@@ -308,7 +310,7 @@ class KlingClient:
 
                     # Transient errors -- retry
                     if code in _TRANSIENT_ERROR_CODES and attempt < retries - 1:
-                        wait = 60 if code == 1200 else (attempt + 1) * 5
+                        wait = 60 if code == 5001 else (attempt + 1) * 5
                         print(f"[KLING] Transient error {code}. Retrying in {wait}s... (Attempt {attempt+1}/{retries})")
                         time.sleep(wait)
                         continue
@@ -360,9 +362,9 @@ class KlingClient:
         print(f"[KLING] Submitting task to {endpoint}...")
         res = self._request("POST", endpoint, request_data)
         data = res.get("data")
-        if not data or "task_id" not in data:
+        task_id = data and (data.get("task_id") or data.get("id"))
+        if not task_id:
             raise KlingAPIError(f"Kling API did not return a task_id. Response: {res}")
-        task_id = data["task_id"]
         print(f"[KLING] Task submitted successfully. Task ID: {task_id}")
         return task_id
 
@@ -403,8 +405,7 @@ class KlingClient:
             if elapsed >= timeout:
                 raise KlingAPIError(f"Polling timed out after {timeout} seconds for task {task_id}.")
 
-            res = self._request("GET", f"{endpoint}/{safe_task_id}")
-            data = res.get("data")
+            data = self._fetch_task(endpoint, safe_task_id)
             if not data:
                 logger.warning(f"[KLING] Polling returned no data for task {task_id}.")
                 self._sleep_with_interrupt(5, throw_exception_if_processing_interrupted)
@@ -449,6 +450,25 @@ class KlingClient:
             interval += random.uniform(0, 2)  # jitter
             self._sleep_with_interrupt(interval, throw_exception_if_processing_interrupted)
 
+    def _fetch_task(self, endpoint: str, safe_task_id: str) -> Optional[Dict[str, Any]]:
+        """GET one task. The unified /tasks endpoint (Kling 3.0 Turbo) is
+        normalized to the per-endpoint response shape poll_task consumes."""
+        if endpoint != TASKS_ENDPOINT:
+            return self._request("GET", f"{endpoint}/{safe_task_id}").get("data")
+        tasks = self._request("GET", f"{TASKS_ENDPOINT}?task_ids={safe_task_id}").get("data")
+        if not tasks:
+            return None
+        task = tasks[0]
+        outputs = task.get("outputs") or []
+        return {
+            "task_status": task.get("status", "unknown"),
+            "task_status_msg": task.get("message", ""),
+            "task_result": {
+                "videos": [o for o in outputs if o.get("type") == "video"],
+                "images": [o for o in outputs if o.get("type") == "image"],
+            },
+        }
+
     @staticmethod
     def _sleep_with_interrupt(seconds: float, interrupt_check) -> None:
         """Sleep in 1-second chunks, polling the interrupt flag between chunks
@@ -461,27 +481,29 @@ class KlingClient:
             interrupt_check()
             time.sleep(min(1.0, remaining))
 
-    def text_to_video(self, model_name: str, prompt: str, aspect_ratio: str, duration: str, negative_prompt: str = "", cfg_scale: float = 0.5, camera_control: Optional[Dict[str, Any]] = None, mode: str = "pro", sound: str = "on", shot_type: str = "natural") -> str:
+    def text_to_video(self, model_name: str, prompt: str, aspect_ratio: str, duration: str, negative_prompt: str = "", cfg_scale: float = 0.5, camera_control: Optional[Dict[str, Any]] = None, mode: str = "pro", sound: str = "on", shot_type: Optional[str] = None, multi_prompt: Optional[List[Dict[str, Any]]] = None) -> str:
         data = {
             "model_name": model_name, "prompt": prompt, "negative_prompt": negative_prompt or None,
             "aspect_ratio": aspect_ratio, "duration": duration, "cfg_scale": cfg_scale,
-            "camera_control": camera_control, "mode": mode, "sound": sound, "shot_type": shot_type
+            "camera_control": camera_control, "mode": mode, "sound": sound,
+            "multi_shot": True if shot_type else None, "shot_type": shot_type, "multi_prompt": multi_prompt
         }
         return self._create_task("/v1/videos/text2video", data)
 
-    def image_to_video(self, model_name: str, image_b64: str, duration: str, prompt: str = "", image_tail_b64: Optional[str] = None, negative_prompt: str = "", cfg_scale: float = 0.5, camera_control: Optional[Dict[str, Any]] = None, mode: str = "pro", sound: str = "on") -> str:
+    def image_to_video(self, model_name: str, image_b64: str, duration: str, prompt: str = "", image_tail_b64: Optional[str] = None, negative_prompt: str = "", cfg_scale: float = 0.5, camera_control: Optional[Dict[str, Any]] = None, mode: str = "pro", sound: str = "on", shot_type: Optional[str] = None, multi_prompt: Optional[List[Dict[str, Any]]] = None) -> str:
         data = {
             "model_name": model_name or "kling-v1", "image": image_b64, "image_tail": image_tail_b64,
             "prompt": prompt or None, "negative_prompt": negative_prompt or None, "duration": duration,
-            "cfg_scale": cfg_scale, "camera_control": camera_control, "mode": mode, "sound": sound
+            "cfg_scale": cfg_scale, "camera_control": camera_control, "mode": mode, "sound": sound,
+            "multi_shot": True if shot_type else None, "shot_type": shot_type, "multi_prompt": multi_prompt
         }
         return self._create_task("/v1/videos/image2video", data)
 
-    def omni_video(self, model_name: str, prompt: str, images: List[Dict[str, str]], videos: List[Dict[str, Any]], aspect_ratio: str, duration: str, mode: str = "pro", multi_prompt: Optional[List[Dict[str, Any]]] = None, shot_type: Optional[str] = None, sound: str = "on") -> str:
+    def omni_video(self, model_name: str, prompt: str, images: List[Dict[str, str]], videos: List[Dict[str, Any]], aspect_ratio: str, duration: str, mode: str = "pro", multi_prompt: Optional[List[Dict[str, Any]]] = None, shot_type: Optional[str] = None, sound: str = "on", elements: Optional[List[Dict[str, Any]]] = None) -> str:
         data = {
             "model_name": model_name, "prompt": prompt, "image_list": images or None, "video_list": videos or None,
-            "aspect_ratio": aspect_ratio, "duration": duration, "mode": mode, "sound": sound,
-            "multi_prompt": multi_prompt, "shot_type": shot_type, "multi_shot": True if multi_prompt else False
+            "element_list": elements or None, "aspect_ratio": aspect_ratio, "duration": duration, "mode": mode, "sound": sound,
+            "multi_prompt": multi_prompt, "shot_type": shot_type, "multi_shot": bool(shot_type)
         }
         return self._create_task("/v1/videos/omni-video", data)
 
@@ -520,14 +542,18 @@ class KlingClient:
             raise KlingAPIError(f"Kling face identification returned no data. Response: {res}")
         return res_data
 
-    def advanced_lip_sync(self, session_id: str, face_id: str, audio_url: str, volume: int = 10, original_audio_volume: int = 0) -> str:
-        """Submits an Advanced Lip-Sync task using a session_id and face_id."""
+    def advanced_lip_sync(self, session_id: str, face_id: str, audio_url: str, sound_start_time: int, sound_end_time: int, sound_insert_time: int, volume: float = 1.0, original_audio_volume: float = 0.0) -> str:
+        """Submits an Advanced Lip-Sync task using a session_id and face_id.
+        Sound times are in milliseconds; volumes range 0-2."""
         data = {
             "session_id": session_id,
             "face_choose": [
                 {
                     "face_id": face_id,
                     "sound_file": audio_url,
+                    "sound_start_time": sound_start_time,
+                    "sound_end_time": sound_end_time,
+                    "sound_insert_time": sound_insert_time,
                     "sound_volume": volume,
                     "original_audio_volume": original_audio_volume
                 }
@@ -535,71 +561,85 @@ class KlingClient:
         }
         return self._create_task("/v1/videos/advanced-lip-sync", data)
 
-    def avatar(self, image_b64: str, audio_url: Optional[str] = None, audio_id: Optional[str] = None, prompt: str = "", mode: str = "pro") -> str:
-        """Kling Avatar (Digital Human) Generation."""
+    def avatar(self, image_b64: str, audio_url: Optional[str] = None, audio_id: Optional[str] = None, prompt: str = "", mode: str = "pro", audio_b64: Optional[str] = None) -> str:
+        """Kling Avatar (Digital Human) Generation. sound_file takes an audio URL or base64."""
         data = {
             "image": image_b64,
             "prompt": prompt or None,
-            "mode": mode
+            "mode": mode,
+            "sound_file": audio_url or audio_b64,
+            "audio_id": audio_id
         }
-        if audio_url:
-            data["sound_file"] = audio_url
-        if audio_id:
-            data["audio_id"] = audio_id
-        return self._create_task("v1/videos/avatar/image2video", data)
+        return self._create_task("/v1/videos/avatar/image2video", data)
 
-    def video_effects(self, effect_scene: str, model_name: str, duration: str, images: List[str], mode: str = "std") -> str:
-        data = {
-            "effect_scene": effect_scene,
-            "input": {
-                "model_name": model_name,
-                "mode": mode,
-                "duration": duration
-            }
-        }
-        if len(images) == 1:
-            data["input"]["image"] = images[0]
-        else:
-            data["input"]["images"] = images
+    def video_effects(self, effect_scene: str, images: List[str]) -> str:
+        """Single-image effects take `image`, dual-image effects take `images`."""
+        key = "image" if len(images) == 1 else "images"
+        data = {"effect_scene": effect_scene, "input": {key: images[0] if len(images) == 1 else images}}
         return self._create_task("/v1/videos/effects", data)
 
     def text_to_audio(self, prompt: str, duration: int) -> str:
         data = {"prompt": prompt, "duration": duration}
         return self._create_task("/v1/audio/text-to-audio", data)
 
-    def video_to_audio(self, video_url: str) -> str:
-        data = {"video_url": video_url}
+    def video_to_audio(self, video_url: str, sound_effect_prompt: Optional[str] = None, bgm_prompt: Optional[str] = None, asmr_mode: Optional[bool] = None) -> str:
+        data = {"video_url": video_url, "sound_effect_prompt": sound_effect_prompt, "bgm_prompt": bgm_prompt, "asmr_mode": asmr_mode}
         return self._create_task("/v1/audio/video-to-audio", data)
 
-    def tts(self, text: str, voice_id: str, voice_speed: float, voice_language: str = "en") -> str:
+    def tts(self, text: str, voice_id: str, voice_speed: float, voice_language: str = "en") -> Dict[str, Any]:
+        """Text-to-speech is synchronous: the create response already carries
+        task_result.audios. Returns the response `data`."""
         data = {"text": text, "voice_id": voice_id, "voice_speed": voice_speed, "voice_language": voice_language}
-        return self._create_task("/v1/audio/tts", data)
-
-    def voice_clone(self, audio_url: Optional[str] = None, audio_b64: Optional[str] = None) -> str:
-        """Clones a voice from audio and returns a reusable voice_id."""
-        data = {}
-        if audio_url:
-            data["audio_url"] = audio_url
-        if audio_b64:
-            data["audio"] = audio_b64
-        res = self._request("POST", "/v1/audio/voice-clone", data)
+        res = self._request("POST", "/v1/audio/tts", data)
         res_data = res.get("data")
-        if not res_data or "voice_id" not in res_data:
-            raise KlingAPIError(f"Kling voice clone returned no voice_id. Response: {res}")
-        return res_data["voice_id"]
+        if not res_data:
+            raise KlingAPIError(f"Kling TTS returned no data. Response: {res}")
+        return res_data
 
-    def image_generation(self, model_name: str, prompt: str, aspect_ratio: str, n: int, resolution: str = "1k", negative_prompt: str = "", fidelity: float = 0.5) -> str:
-        data = {"model_name": model_name, "prompt": prompt, "negative_prompt": negative_prompt or None, "aspect_ratio": aspect_ratio, "n": n, "resolution": resolution.lower(), "fidelity": fidelity}
+    def create_voice(self, voice_name: str, voice_url: str) -> str:
+        """Submits a custom-voice task from an audio/video URL. Returns the task_id."""
+        return self._create_task("/v1/general/custom-voices", {"voice_name": voice_name, "voice_url": voice_url})
+
+    def create_element(self, element_name: str, element_description: str, frontal_image_b64: str, refer_images_b64: List[str]) -> str:
+        """Submits a multi-image element task. Returns the task_id."""
+        data = {
+            "element_name": element_name, "element_description": element_description, "reference_type": "image_refer",
+            "element_image_list": {"frontal_image": frontal_image_b64, "refer_images": [{"image_url": i} for i in refer_images_b64]}
+        }
+        return self._create_task("/v1/general/advanced-custom-elements", data)
+
+    def subject_completion(self, frontal_image_b64: str) -> str:
+        """Generates other-angle images of an element from its frontal image."""
+        return self._create_task("/v1/general/ai-multi-shot", {"element_frontal_image": frontal_image_b64})
+
+    def multi_image_to_video(self, prompt: str, images_b64: List[str], negative_prompt: str = "", mode: str = "std", duration: str = "5", aspect_ratio: str = "16:9") -> str:
+        data = {
+            "model_name": "kling-v1-6", "prompt": prompt, "negative_prompt": negative_prompt or None,
+            "image_list": [{"image": i} for i in images_b64], "mode": mode, "duration": duration, "aspect_ratio": aspect_ratio
+        }
+        return self._create_task("/v1/videos/multi-image2video", data)
+
+    def reference_to_image(self, prompt: str, subjects_b64: List[str], scene_b64: Optional[str], style_b64: Optional[str], n: int = 1, aspect_ratio: str = "1:1") -> str:
+        data = {
+            "model_name": "kling-v2-1", "prompt": prompt or None,
+            "subject_image_list": [{"subject_image": i} for i in subjects_b64],
+            "scene_image": scene_b64, "style_image": style_b64, "n": n, "aspect_ratio": aspect_ratio
+        }
+        return self._create_task("/v1/images/multi-image2image", data)
+
+    def image_generation(self, model_name: str, prompt: str, aspect_ratio: str, n: int, resolution: str = "1k", negative_prompt: str = "") -> str:
+        data = {"model_name": model_name, "prompt": prompt, "negative_prompt": negative_prompt or None, "aspect_ratio": aspect_ratio, "n": n, "resolution": resolution.lower()}
         return self._create_task("/v1/images/generations", data)
 
     def virtual_try_on(self, human_image_b64: str, cloth_image_b64: str, model_name: str = "kolors-virtual-try-on-v1") -> str:
         data = {"model_name": model_name, "human_image": human_image_b64, "cloth_image": cloth_image_b64}
         return self._create_task("/v1/images/kolors-virtual-try-on", data)
 
-    def motion_control(self, model_name: str, image_b64: str, video_url: str, prompt: str = "", character_orientation: str = "image", mode: str = "pro") -> str:
+    def motion_control(self, model_name: str, image_b64: str, video_url: str, prompt: str = "", character_orientation: str = "image", mode: str = "pro", keep_original_sound: Optional[str] = None) -> str:
         data = {
-            "model_name": model_name, "image": image_b64, "video_url": video_url,
-            "prompt": prompt or None, "character_orientation": character_orientation, "mode": mode
+            "model_name": model_name, "image_url": image_b64, "video_url": video_url,
+            "prompt": prompt or None, "character_orientation": character_orientation, "mode": mode,
+            "keep_original_sound": keep_original_sound
         }
         return self._create_task("/v1/videos/motion-control", data)
 
@@ -610,17 +650,26 @@ class KlingClient:
         }
         return self._create_task("/v1/images/omni-image", data)
 
-    def extend_image(self, image_id: str, prompt: str = "", aspect_ratio: str = "1:1") -> str:
-        data = {"image_id": image_id, "prompt": prompt or None, "aspect_ratio": aspect_ratio}
+    def extend_image(self, image_b64: str, up: float, down: float, left: float, right: float, prompt: str = "") -> str:
+        """Outpaints an image. Ratios are multiples of the original height (up/down) or width (left/right)."""
+        data = {
+            "image": image_b64, "prompt": prompt or None,
+            "up_expansion_ratio": up, "down_expansion_ratio": down,
+            "left_expansion_ratio": left, "right_expansion_ratio": right
+        }
         return self._create_task("/v1/images/editing/expand", data)
 
     def multi_shot_image(self, model_name: str, prompt: str, shots: List[Dict[str, Any]], aspect_ratio: str = "1:1") -> str:
         data = {"model_name": model_name, "prompt": prompt, "shots": shots, "aspect_ratio": aspect_ratio}
         return self._create_task("/v1/images/ai-multi-shot", data)
 
-    def image_recognize(self, image_b64: str) -> str:
-        data = {"image": image_b64}
-        return self._create_task("/v1/images/recognize", data)
+    def image_recognize(self, image_b64: str) -> Dict[str, Any]:
+        """Image recognition is synchronous. Returns the response `data`."""
+        res = self._request("POST", "/v1/videos/image-recognize", {"image": image_b64})
+        res_data = res.get("data")
+        if not res_data:
+            raise KlingAPIError(f"Kling image recognition returned no data. Response: {res}")
+        return res_data
 
     def effect_templates(self) -> Dict[str, Any]:
         """Fetches available effect templates."""
@@ -629,14 +678,27 @@ class KlingClient:
     def get_task_status(self, endpoint: str, task_id: str) -> Dict[str, Any]:
         """One-shot task status check (no polling). Used by Task Status node."""
         safe_task_id = _url_quote(str(task_id), safe="")
+        if endpoint == TASKS_ENDPOINT:
+            return {"data": self._fetch_task(endpoint, safe_task_id)}
         return self._request("GET", f"{endpoint}/{safe_task_id}")
 
-    def account_balance(self) -> Dict[str, Any]:
-        """Fetches account balance / remaining credits. Endpoint may vary by region.
-        Returns the raw `data` dict (caller should display whatever fields are present)."""
-        # Kling exposes balance via /v1/account/costs ; we surface it raw.
-        res = self._request("GET", "/v1/account/costs")
+    def account_costs(self) -> Dict[str, Any]:
+        """Lists the account's resource packages (free call, QPS <= 1). Also
+        verifies credentials and connectivity."""
+        end = int(time.time() * 1000)
+        res = self._request("GET", f"/account/costs?start_time={end - 30 * 86400 * 1000}&end_time={end}")
         return res.get("data", {})
+
+    def turbo_text_to_video(self, prompt: str, resolution: str, aspect_ratio: str, duration: int) -> str:
+        data = {"prompt": prompt, "settings": {"resolution": resolution, "aspect_ratio": aspect_ratio, "duration": duration}}
+        return self._create_task("/text-to-video/kling-3.0-turbo", data)
+
+    def turbo_image_to_video(self, image_b64: str, prompt: str, resolution: str, duration: int) -> str:
+        contents = [{"type": "first_frame", "url": image_b64}]
+        if prompt:
+            contents.insert(0, {"type": "prompt", "text": prompt})
+        data = {"contents": contents, "settings": {"resolution": resolution, "duration": duration}}
+        return self._create_task("/image-to-video/kling-3.0-turbo", data)
 
     def upload_asset(self, file_path: str = None, b64_data: str = None, asset_type: str = "audio") -> Dict[str, Any]:
         """Uploads a local file or base64 data to Kling materials.

@@ -81,40 +81,46 @@ SAFE_FILENAME_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 EMPTY_AUDIO = {"waveform": torch.zeros((1, 1, 1024)), "sample_rate": 44100}
 
 VIDEO_MODELS = ["kling-v3", "kling-v2-5-turbo", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
-VIDEO_MODELS_I2V = ["kling-v3", "kling-v2-6", "kling-v2-master", "kling-v1-6"]
+VIDEO_MODELS_I2V = ["kling-v3", "kling-v2-6", "kling-v2-master", "kling-v1-6", "kling-v2-5-turbo"]
+MOTION_CONTROL_MODELS = ["kling-v2-6", "kling-v3"]
+VIDEO_DURATIONS = [str(d) for d in range(3, 16)]
 UPSCALE_MODELS = ["kling-v1", "kling-v3"]
 
 # v2.1: Region selector. Kling exposes multiple regional endpoints; users with
 # global vs China accounts hit different gateways. Singapore is default.
 KLING_REGIONS = {
     "singapore": "https://api-singapore.klingai.com",
-    "china": "https://api.klingai.com",
+    "china": "https://api-beijing.klingai.com",
     "us": "https://api-us.klingai.com",
 }
 
 # v2.1: Camera-control presets. Each emits a (type, config) pair that
-# matches Kling's camera_control schema. Values are within Kling's accepted
-# -10..10 range per axis.
+# matches Kling's camera_control schema: type "simple" with exactly one
+# non-zero axis in -10..10.
 CAMERA_PRESETS = {
     "none": ("simple", {}),
-    "orbit_left": ("horizontal", {"horizontal": -7.0}),
-    "orbit_right": ("horizontal", {"horizontal": 7.0}),
-    "dolly_in": ("zoom", {"zoom": 5.0}),
-    "dolly_out": ("zoom", {"zoom": -5.0}),
-    "zoom_in": ("zoom", {"zoom": 7.0}),
-    "zoom_out": ("zoom", {"zoom": -7.0}),
-    "pan_left": ("pan", {"pan": -5.0}),
-    "pan_right": ("pan", {"pan": 5.0}),
-    "tilt_up": ("tilt", {"tilt": 5.0}),
-    "tilt_down": ("tilt", {"tilt": -5.0}),
-    "crane_up": ("vertical", {"vertical": 5.0}),
-    "crane_down": ("vertical", {"vertical": -5.0}),
-    "roll_cw": ("roll", {"roll": 5.0}),
-    "roll_ccw": ("roll", {"roll": -5.0}),
+    "orbit_left": ("simple", {"horizontal": -7.0}),
+    "orbit_right": ("simple", {"horizontal": 7.0}),
+    "dolly_in": ("simple", {"zoom": 5.0}),
+    "dolly_out": ("simple", {"zoom": -5.0}),
+    "zoom_in": ("simple", {"zoom": 7.0}),
+    "zoom_out": ("simple", {"zoom": -7.0}),
+    "pan_left": ("simple", {"pan": -5.0}),
+    "pan_right": ("simple", {"pan": 5.0}),
+    "tilt_up": ("simple", {"tilt": 5.0}),
+    "tilt_down": ("simple", {"tilt": -5.0}),
+    "crane_up": ("simple", {"vertical": 5.0}),
+    "crane_down": ("simple", {"vertical": -5.0}),
+    "roll_cw": ("simple", {"roll": 5.0}),
+    "roll_ccw": ("simple", {"roll": -5.0}),
 }
+CAMERA_AXES = ("horizontal", "vertical", "pan", "tilt", "roll", "zoom")
+# Predefined movements that take no config.
+CAMERA_MOVES = ["down_back", "forward_up", "right_turn_forward", "left_turn_forward"]
 
 # v2.1: Polling endpoints (used by the new Task Status node).
 TASK_ENDPOINTS = [
+    "/tasks",
     "/v1/videos/text2video",
     "/v1/videos/image2video",
     "/v1/videos/omni-video",
@@ -125,6 +131,8 @@ TASK_ENDPOINTS = [
     "/v1/videos/avatar/image2video",
     "/v1/videos/effects",
     "/v1/videos/upscale",
+    "/v1/videos/multi-image2video",
+    "/v1/images/multi-image2image",
     "/v1/images/generations",
     "/v1/images/omni-image",
     "/v1/images/editing/expand",
@@ -135,6 +143,9 @@ TASK_ENDPOINTS = [
     "/v1/audio/text-to-audio",
     "/v1/audio/tts",
     "/v1/audio/video-to-audio",
+    "/v1/general/custom-voices",
+    "/v1/general/advanced-custom-elements",
+    "/v1/general/ai-multi-shot",
 ]
 
 
@@ -163,11 +174,17 @@ def _extract_video_id(res: dict) -> str:
     return videos[0].get("id", "")
 
 
-def _extract_image_url(res: dict, index: int = 0) -> str:
-    """Safely extract an image URL from a poll_task result."""
-    images = res.get("images")
+def _task_images(res: dict) -> list:
+    """Return task_result.images from a poll_task result."""
+    images = (res.get("task_result") or {}).get("images")
     if not images:
         raise Exception(f"Kling task completed but returned no images. Response keys: {list(res.keys())}")
+    return images
+
+
+def _extract_image_url(res: dict, index: int = 0) -> str:
+    """Safely extract an image URL from a poll_task result."""
+    images = _task_images(res)
     if index >= len(images):
         raise Exception(f"Kling task returned {len(images)} image(s), but index {index} requested.")
     url = images[index].get("url")
@@ -177,11 +194,51 @@ def _extract_image_url(res: dict, index: int = 0) -> str:
 
 
 def _extract_audio_url(res: dict) -> str:
-    """Safely extract audio_url from an audio poll_task result."""
-    url = res.get("audio_url")
+    """Safely extract the first audio URL (mp3 when offered) from a task result."""
+    audios = (res.get("task_result") or {}).get("audios")
+    if not audios:
+        raise Exception(f"Kling task completed but returned no audios. Response keys: {list(res.keys())}")
+    url = audios[0].get("url_mp3") or audios[0].get("url")
     if not url:
-        raise Exception(f"Kling task completed but returned no audio_url. Response keys: {list(res.keys())}")
+        raise Exception(f"Kling task completed but audio has no URL. Audio data: {audios[0]}")
     return url
+
+
+def _build_multi_shot(shot_list: str, shot_type: str = ""):
+    """Return (shot_type, multi_prompt) for Kling's multi-shot fields.
+
+    Each non-empty line of shot_list is `seconds|prompt` (customize storyboard).
+    Without lines, shot_type "intelligence" lets Kling split the prompt itself.
+    """
+    shots = []
+    for line in (shot_list or "").splitlines():
+        if not line.strip():
+            continue
+        seconds, sep, text = line.partition("|")
+        if not sep or not seconds.strip().isdigit():
+            raise ValueError(f"Kling shot_list lines must look like 'seconds|prompt', got: {line!r}")
+        shots.append({"index": len(shots) + 1, "prompt": text.strip(), "duration": seconds.strip()})
+    if shots:
+        return "customize", shots
+    if shot_type == "intelligence":
+        return "intelligence", None
+    return None, None
+
+
+def _expansion_ratios(width: int, height: int, aspect_ratio: str) -> tuple:
+    """Return (up, down, left, right) outpaint ratios that pad an image evenly to aspect_ratio."""
+    target_w, target_h = (float(x) for x in aspect_ratio.split(":"))
+    target = target_w / target_h
+    if target >= width / height:
+        pad = (height * target - width) / 2 / width
+        return 0.0, 0.0, pad, pad
+    pad = (width / target - height) / 2 / height
+    return pad, pad, 0.0, 0.0
+
+
+def _element_list(element_ids: str) -> list:
+    """Parse comma/space separated element IDs into Kling's element_list."""
+    return [{"element_id": int(i)} for i in re.split(r"[,\s]+", element_ids or "") if i]
 
 
 def _extract_asset_id(res: dict) -> str:
@@ -210,6 +267,7 @@ def _make_client(auth: dict) -> KlingClient:
         auth["secret_key"],
         debug=auth.get("debug", False),
         base_url=base_url,
+        api_key=auth.get("api_key", ""),
     )
 
 
@@ -276,8 +334,13 @@ VOICES_CONFIG = {
 }
 
 MODES = ["pro", "std"]
+VIDEO_MODES = MODES + ["4k"]
 ASPECT_RATIOS = ["16:9", "9:16", "1:1", "3:2", "2:3", "4:3", "3:4"]
+IMAGE_ASPECT_RATIOS = ASPECT_RATIOS + ["21:9"]
+OMNI_IMAGE_ASPECT_RATIOS = IMAGE_ASPECT_RATIOS + ["auto"]
 IMAGE_RESOLUTIONS = ["1k", "2k"]
+OMNI_IMAGE_RESOLUTIONS = IMAGE_RESOLUTIONS + ["4k"]
+KEEP_SOUND_CHOICES = ["default", "yes", "no"]
 
 # --- Helper Functions ---
 
@@ -854,10 +917,12 @@ def audio_to_wav_bytes_full_quality(audio: Dict[str, Any]) -> bytes:
 # --- K5: Auth node using DualKeyAPIKeyNode ---
 
 class KlingDirect_Auth(DualKeyAPIKeyNode):
-    """Kling AI authentication node with access_key + secret_key + debug toggle."""
+    """Kling AI authentication node with access_key + secret_key (or a single
+    API key) + debug toggle."""
 
     ENV_VAR_ACCESS = "KLING_ACCESS_KEY"
     ENV_VAR_SECRET = "KLING_SECRET_KEY"
+    ENV_VAR_API_KEY = "KLING_API_KEY"
     SERVICE_NAME = "Kling AI"
 
     @classmethod
@@ -867,6 +932,11 @@ class KlingDirect_Auth(DualKeyAPIKeyNode):
             "default": False,
             "tooltip": "Enable verbose debug logging for all Kling API requests.",
         })
+        base["optional"] = {"api_key": ("STRING", {
+            "default": "",
+            "password": True,
+            "tooltip": f"Kling API key. Used instead of the access/secret keys when set (required for Kling 3.0 Turbo). Leave blank to use {cls.ENV_VAR_API_KEY} environment variable.",
+        })}
         return base
 
     RETURN_TYPES = ("KLING_AUTH",)
@@ -874,9 +944,14 @@ class KlingDirect_Auth(DualKeyAPIKeyNode):
     FUNCTION = "execute"
     CATEGORY = "Kling AI/Config"
 
-    def execute(self, access_key: str = "", secret_key: str = "", debug: bool = False):
-        ak, sk = self.provide_keys(access_key, secret_key)
-        return ({"access_key": ak, "secret_key": sk, "debug": debug},)
+    def execute(self, access_key: str = "", secret_key: str = "", debug: bool = False, api_key: str = ""):
+        api_key = api_key.strip() or os.environ.get(self.ENV_VAR_API_KEY, "").strip()
+        if api_key:
+            ak = access_key.strip() or os.environ.get(self.ENV_VAR_ACCESS, "").strip()
+            sk = secret_key.strip() or os.environ.get(self.ENV_VAR_SECRET, "").strip()
+        else:
+            ak, sk = self.provide_keys(access_key, secret_key)
+        return ({"access_key": ak, "secret_key": sk, "api_key": api_key, "debug": debug},)
 
 
 # --- Config / Utility Nodes ---
@@ -1015,7 +1090,7 @@ class KlingDirect_CameraControl:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-            "type": (["simple", "horizontal", "vertical", "pan", "tilt", "roll", "zoom"], {"default": "simple", "tooltip": "Camera movement type."}),
+            "type": (["simple", *CAMERA_AXES, *CAMERA_MOVES], {"default": "simple", "tooltip": "Camera movement type. An axis name moves only along that axis; simple uses all six values below; the remaining types are predefined moves."}),
             "horizontal": ("FLOAT", {"default": 0.0, "min": -10.0, "max": 10.0, "tooltip": "Horizontal camera movement (-10 to 10)."}),
             "vertical": ("FLOAT", {"default": 0.0, "min": -10.0, "max": 10.0, "tooltip": "Vertical camera movement (-10 to 10)."}),
             "pan": ("FLOAT", {"default": 0.0, "min": -10.0, "max": 10.0, "tooltip": "Camera pan (-10 to 10)."}),
@@ -1028,7 +1103,13 @@ class KlingDirect_CameraControl:
     CATEGORY = "Kling AI/Config"
 
     def execute(self, **kwargs):
-        return ({"type": kwargs["type"], "config": {k: v for k, v in kwargs.items() if k != "type"}},)
+        cam_type = kwargs["type"]
+        config = {k: v for k, v in kwargs.items() if k != "type"}
+        if cam_type in CAMERA_AXES:
+            return ({"type": "simple", "config": {k: (v if k == cam_type else 0.0) for k, v in config.items()}},)
+        if cam_type in CAMERA_MOVES:
+            return ({"type": cam_type},)
+        return ({"type": "simple", "config": config},)
 
 
 class KlingDirect_CloudUploader(AlwaysExecuteMixin):
@@ -1176,23 +1257,25 @@ class KlingDirect_TextToVideo(AlwaysExecuteMixin):
             "negative_prompt": ("STRING", {"default": "", "tooltip": "Things to avoid in the generated video."}),
             "model_name": (VIDEO_MODELS, {"default": "kling-v3", "tooltip": "Kling model version. v3 is latest, v2-master for cinematic quality."}),
             "aspect_ratio": (ASPECT_RATIOS, {"default": "16:9", "tooltip": "Output video aspect ratio."}),
-            "duration": (["5", "10", "15"], {"default": "5", "tooltip": "Video duration in seconds."}),
-            "mode": (MODES, {"default": "pro", "tooltip": "Generation mode: 'pro' for higher quality, 'std' for faster/cheaper."}),
+            "duration": (VIDEO_DURATIONS, {"default": "5", "tooltip": "Video duration in seconds. Supported range varies by model (kling-v3 supports 3-15)."}),
+            "mode": (VIDEO_MODES, {"default": "pro", "tooltip": "Generation mode: 'pro' for higher quality, 'std' for faster/cheaper, '4k' for 4K output (kling-v3)."}),
             "sound": ("BOOLEAN", {"default": True, "tooltip": "Enable AI-generated sound effects and ambient audio."}),
             "cfg_scale": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Classifier-free guidance scale. Higher = more prompt adherence, lower = more creative."}),
-            "shot_type": (["natural", "wide_angle", "medium_shot", "close_up"], {"default": "natural", "tooltip": "Camera shot framing style."})
+            "shot_type": (["natural", "wide_angle", "medium_shot", "close_up", "intelligence"], {"default": "natural", "tooltip": "Only 'intelligence' is sent: Kling splits the prompt into multiple shots itself. The other values have no effect."})
         }, "optional": {
             "camera_control": ("KLING_CAMERA",),
+            "shot_list": ("STRING", {"default": "", "multiline": True, "tooltip": "Multi-shot storyboard, one shot per line as 'seconds|prompt' (up to 6 shots; seconds must add up to duration). Leave blank for a single shot."}),
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Video"
 
-    def generate(self, auth, prompt, negative_prompt, model_name, aspect_ratio, duration, mode, sound, cfg_scale, shot_type="natural", camera_control=None):
+    def generate(self, auth, prompt, negative_prompt, model_name, aspect_ratio, duration, mode, sound, cfg_scale, shot_type="natural", camera_control=None, shot_list=""):
         client = _make_client(auth)
         sound_val = "on" if sound else "off"
-        task_id = client.text_to_video(model_name, normalize_prompts(prompt), aspect_ratio, duration, negative_prompt, cfg_scale, camera_control, mode, sound_val, shot_type=shot_type)
+        multi_shot_type, multi_prompt = _build_multi_shot(shot_list, shot_type)
+        task_id = client.text_to_video(model_name, normalize_prompts(prompt), aspect_ratio, duration, negative_prompt, cfg_scale, camera_control, mode, sound_val, shot_type=multi_shot_type, multi_prompt=multi_prompt)
         res = client.poll_task("/v1/videos/text2video", task_id)
         url = _extract_video_url(res)
         path, name = download_to_output(url)
@@ -1209,23 +1292,25 @@ class KlingDirect_ImageToVideo(AlwaysExecuteMixin):
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Optional text prompt to guide the video generation from the image."}),
             "negative_prompt": ("STRING", {"default": "", "tooltip": "Things to avoid in the generated video."}),
             "model_name": (VIDEO_MODELS_I2V, {"default": "kling-v3", "tooltip": "Kling model version for image-to-video."}),
-            "duration": (["5", "10", "15"], {"default": "5", "tooltip": "Video duration in seconds."}),
-            "mode": (MODES, {"default": "pro", "tooltip": "Generation mode: 'pro' for higher quality, 'std' for faster/cheaper."}),
+            "duration": (VIDEO_DURATIONS, {"default": "5", "tooltip": "Video duration in seconds. Supported range varies by model (kling-v3 supports 3-15)."}),
+            "mode": (VIDEO_MODES, {"default": "pro", "tooltip": "Generation mode: 'pro' for higher quality, 'std' for faster/cheaper, '4k' for 4K output (kling-v3)."}),
             "sound": ("BOOLEAN", {"default": True, "tooltip": "Enable AI-generated sound effects and ambient audio."}),
             "cfg_scale": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Classifier-free guidance scale. Higher = more prompt adherence, lower = more creative."})
         }, "optional": {
             "image_tail": ("IMAGE",),
             "camera_control": ("KLING_CAMERA",),
+            "shot_list": ("STRING", {"default": "", "multiline": True, "tooltip": "Multi-shot storyboard, one shot per line as 'seconds|prompt' (up to 6 shots; seconds must add up to duration). Leave blank for a single shot."}),
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Video"
 
-    def generate(self, auth, image, prompt, negative_prompt, model_name, duration, mode, sound, cfg_scale, image_tail=None, camera_control=None):
+    def generate(self, auth, image, prompt, negative_prompt, model_name, duration, mode, sound, cfg_scale, image_tail=None, camera_control=None, shot_list=""):
         client = _make_client(auth)
         sound_val = "on" if sound else "off"
-        task_id = client.image_to_video(model_name, tensor_to_base64_string(image), duration, normalize_prompts(prompt), tensor_to_base64_string(image_tail), negative_prompt, cfg_scale, camera_control, mode, sound_val)
+        multi_shot_type, multi_prompt = _build_multi_shot(shot_list)
+        task_id = client.image_to_video(model_name, tensor_to_base64_string(image), duration, normalize_prompts(prompt), tensor_to_base64_string(image_tail), negative_prompt, cfg_scale, camera_control, mode, sound_val, shot_type=multi_shot_type, multi_prompt=multi_prompt)
         res = client.poll_task("/v1/videos/image2video", task_id)
         url = _extract_video_url(res)
         path, name = download_to_output(url)
@@ -1240,31 +1325,44 @@ class KlingDirect_VideoOmni(AlwaysExecuteMixin):
             "auth": ("KLING_AUTH",),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text prompt. Use @image1, @video1 to reference optional inputs."}),
             "model_name": (["kling-video-o1", "kling-v3-omni"], {"default": "kling-video-o1", "tooltip": "Omni model version."}),
-            "duration": (["5", "10", "15"], {"default": "5", "tooltip": "Video duration in seconds."}),
+            "duration": (VIDEO_DURATIONS, {"default": "5", "tooltip": "Video duration in seconds."}),
             "aspect_ratio": (ASPECT_RATIOS, {"default": "16:9", "tooltip": "Output video aspect ratio."}),
-            "mode": (MODES, {"default": "pro", "tooltip": "Generation mode."})
+            "mode": (VIDEO_MODES, {"default": "pro", "tooltip": "Generation mode. 4k is supported by kling-v3-omni."})
         }, "optional": {
             "image_1": ("IMAGE",),
             "image_2": ("IMAGE",),
             "video_url": ("STRING", {"default": "", "tooltip": "URL of a reference video for omni generation."}),
+            "sound": ("BOOLEAN", {"default": True, "tooltip": "Generate sound with the video. Always off when a reference video is used."}),
+            "element_ids": ("STRING", {"default": "", "tooltip": "Element IDs from the Kling element library (see Create Element), comma separated. Reference them in the prompt as <<<element_1>>>."}),
+            "shot_list": ("STRING", {"default": "", "multiline": True, "tooltip": "Multi-shot storyboard, one shot per line as 'seconds|prompt' (up to 6 shots; seconds must add up to duration). Leave blank for a single shot."}),
+            "video_refer_type": (["base", "feature"], {"default": "base", "tooltip": "How the reference video is used: base = the video to edit, feature = a style/camera/next-shot reference."}),
+            "keep_original_sound": (KEEP_SOUND_CHOICES, {"default": "default", "tooltip": "Keep the reference video's original audio. 'default' leaves it to Kling."}),
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Video"
 
-    def generate(self, auth, prompt, model_name, duration, aspect_ratio, mode, image_1=None, image_2=None, video_url=None):
+    def generate(self, auth, prompt, model_name, duration, aspect_ratio, mode, image_1=None, image_2=None, video_url=None,
+                 sound=True, element_ids="", shot_list="", video_refer_type="base", keep_original_sound="default"):
         client = _make_client(auth)
         # K2: Build image/video lists from optional inputs instead of empty []
         images = []
         if image_1 is not None:
-            images.append({"image": tensor_to_base64_string(image_1)})
+            images.append({"image_url": tensor_to_base64_string(image_1)})
         if image_2 is not None:
-            images.append({"image": tensor_to_base64_string(image_2)})
+            images.append({"image_url": tensor_to_base64_string(image_2)})
         videos = []
         if video_url and video_url.strip():
-            videos.append({"video_url": video_url.strip()})
-        task_id = client.omni_video(model_name, normalize_prompts(prompt), images, videos, aspect_ratio, duration, mode=mode)
+            videos.append({
+                "video_url": video_url.strip(), "refer_type": video_refer_type,
+                "keep_original_sound": None if keep_original_sound == "default" else keep_original_sound,
+            })
+        multi_shot_type, multi_prompt = _build_multi_shot(shot_list)
+        task_id = client.omni_video(
+            model_name, normalize_prompts(prompt), images, videos, aspect_ratio, duration, mode=mode,
+            multi_prompt=multi_prompt, shot_type=multi_shot_type,
+            sound="on" if sound and not videos else "off", elements=_element_list(element_ids))
         res = client.poll_task("/v1/videos/omni-video", task_id)
         url = _extract_video_url(res)
         path, name = download_to_output(url)
@@ -1277,7 +1375,7 @@ class KlingDirect_VideoExtend(AlwaysExecuteMixin):
     def INPUT_TYPES(s):
         return {"required": {
             "auth": ("KLING_AUTH",),
-            "video_id": ("STRING", {"default": "", "forceInput": True, "tooltip": "Task ID of the video to extend (from a previous generation)."}),
+            "video_id": ("STRING", {"default": "", "forceInput": True, "tooltip": "ID of the video to extend (from a previous generation). Kling can only extend videos made by kling-v1, kling-v1-5 and kling-v1-6, within 30 days."}),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Prompt for the extended portion."}),
             "negative_prompt": ("STRING", {"default": "", "tooltip": "Things to avoid in the extended video."}),
             "cfg_scale": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Classifier-free guidance scale."})
@@ -1371,20 +1469,12 @@ class KlingDirect_AvatarGen(AlwaysExecuteMixin):
 
     def generate(self, auth, image, prompt, mode, audio=None, audio_url=None):
         client = _make_client(auth)
-        audio_id = None
-        audio_url_val = audio_url if audio_url != "" else None
-
-        if audio is not None:
-            print("[KLING] Converting audio and uploading material asset...")
-            audio_b64 = audio_to_base64_string(audio, target_sr=TARGET_SAMPLE_RATE)
-            asset_res = client.upload_asset(b64_data=audio_b64, asset_type="audio")
-            audio_id = _extract_asset_id(asset_res)
-            print(f"[KLING] Audio uploaded. Materials ID: {audio_id}")
+        audio_b64 = audio_to_base64_string(audio, target_sr=TARGET_SAMPLE_RATE) if audio is not None else None
 
         task_id = client.avatar(
             image_b64=tensor_to_base64_string(image),
-            audio_url=audio_url_val,
-            audio_id=audio_id,
+            audio_url=audio_url or None,
+            audio_b64=audio_b64,
             prompt=prompt,
             mode=mode
         )
@@ -1403,14 +1493,18 @@ class KlingDirect_AdvancedLipSync(AlwaysExecuteMixin):
             "video_url": ("STRING", {"default": "", "tooltip": "URL of the source video."}),
             "audio_url": ("STRING", {"default": "", "tooltip": "URL of the audio to sync."}),
             "face_index": ("INT", {"default": 0, "min": 0, "max": 10, "tooltip": "Index of the detected face to sync (0 = first face)."}),
-            "volume": ("INT", {"default": 10, "min": 0, "max": 100, "tooltip": "Volume of the synced audio (0-100)."})
+            "volume": ("INT", {"default": 10, "min": 0, "max": 100, "tooltip": "Volume of the synced audio. 10 = normal; Kling caps the gain at 2x (20)."})
+        }, "optional": {
+            "sound_start_time": ("INT", {"default": 0, "min": 0, "max": 3600000, "tooltip": "Start of the audio crop in ms."}),
+            "sound_end_time": ("INT", {"default": 0, "min": 0, "max": 3600000, "tooltip": "End of the audio crop in ms. 0 = the full audio length (measured by downloading the audio)."}),
+            "sound_insert_time": ("INT", {"default": 0, "min": 0, "max": 3600000, "tooltip": "Where in the video (ms) the audio is inserted. 0 = when the selected face first appears."}),
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Video"
 
-    def generate(self, auth, video_url, audio_url, face_index=0, volume=10):
+    def generate(self, auth, video_url, audio_url, face_index=0, volume=10, sound_start_time=0, sound_end_time=0, sound_insert_time=0):
         client = _make_client(auth)
 
         print("[KLING] Identifying face in video...")
@@ -1429,7 +1523,14 @@ class KlingDirect_AdvancedLipSync(AlwaysExecuteMixin):
             raise Exception(f"Kling face at index {idx} has no face_id. Face data: {faces[idx]}")
         print(f"[KLING] Selected face ID: {face_id} from {len(faces)} detected face(s).")
 
-        task_id = client.advanced_lip_sync(session_id, face_id, audio_url, volume=volume)
+        if not sound_end_time:
+            clip = download_audio_to_tensor(audio_url)
+            sound_end_time = int(clip["waveform"].shape[-1] / clip["sample_rate"] * 1000)
+            if sound_end_time < 2000:
+                raise ValueError("Kling Advanced Lip Sync could not measure the audio length. Set sound_end_time (ms).")
+        sound_insert_time = sound_insert_time or faces[idx].get("start_time", 0)
+
+        task_id = client.advanced_lip_sync(session_id, face_id, audio_url, sound_start_time, sound_end_time, sound_insert_time, volume=min(volume / 10.0, 2.0))
         res = client.poll_task("/v1/videos/advanced-lip-sync", task_id)
         url = _extract_video_url(res)
         path, name = download_to_output(url)
@@ -1448,10 +1549,10 @@ class KlingDirect_ImageGen(AlwaysExecuteMixin):
             "auth": ("KLING_AUTH",),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text description of the image to generate."}),
             "negative_prompt": ("STRING", {"default": "", "tooltip": "Things to avoid in the generated image."}),
-            "model_name": (["kling-v3"], {"default": "kling-v3", "tooltip": "Kling image model version."}),
-            "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1", "tooltip": "Output image aspect ratio."}),
+            "model_name": (["kling-v3", "kling-v2-1"], {"default": "kling-v3", "tooltip": "Kling image model version."}),
+            "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "1:1", "tooltip": "Output image aspect ratio."}),
             "resolution": (IMAGE_RESOLUTIONS, {"default": "1k", "tooltip": "Output resolution: 1k (~1024px) or 2k (~2048px)."}),
-            "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Image fidelity/detail level (0.0 = creative, 1.0 = faithful)."}),
+            "fidelity": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Not used: the Kling image API no longer accepts this value for the available models."}),
             "n": ("INT", {"default": 1, "min": 1, "max": 9, "tooltip": "Number of images to generate (1-9)."})
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
@@ -1461,12 +1562,10 @@ class KlingDirect_ImageGen(AlwaysExecuteMixin):
 
     def generate(self, auth, prompt, negative_prompt, model_name, aspect_ratio, resolution, fidelity, n=1):
         client = _make_client(auth)
-        task_id = client.image_generation(model_name, normalize_prompts(prompt), aspect_ratio, n, resolution, negative_prompt, fidelity)
+        task_id = client.image_generation(model_name, normalize_prompts(prompt), aspect_ratio, n, resolution, negative_prompt)
         res = client.poll_task("/v1/images/generations", task_id)
         if n > 1:
-            images = res.get("images", [])
-            if not images:
-                raise Exception("Kling image generation completed but returned no images.")
+            images = _task_images(res)
             imgs = [download_to_tensor(img["url"]) for img in images]
             url = images[0].get("url", "")
             return (torch.cat(imgs, dim=0), url, task_id)
@@ -1482,17 +1581,20 @@ class KlingDirect_ImageOmni(AlwaysExecuteMixin):
             "auth": ("KLING_AUTH",),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text prompt for omni image generation. Use @image1 to reference input."}),
             "image_1": ("IMAGE",),
-            "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1", "tooltip": "Output aspect ratio."}),
-            "resolution": (IMAGE_RESOLUTIONS, {"default": "1k", "tooltip": "Output resolution."})
+            "aspect_ratio": (OMNI_IMAGE_ASPECT_RATIOS, {"default": "1:1", "tooltip": "Output aspect ratio. 'auto' lets Kling choose from the inputs."}),
+            "resolution": (OMNI_IMAGE_RESOLUTIONS, {"default": "1k", "tooltip": "Output resolution."})
+        }, "optional": {
+            "model_name": (["kling-image-o1", "kling-v3-omni"], {"default": "kling-image-o1", "tooltip": "Omni image model. 4k needs kling-v3-omni."}),
+            "element_ids": ("STRING", {"default": "", "tooltip": "Element IDs from the Kling element library (see Create Element), comma separated."}),
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("image", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Image"
 
-    def generate(self, auth, prompt, image_1, aspect_ratio, resolution):
+    def generate(self, auth, prompt, image_1, aspect_ratio, resolution, model_name="kling-image-o1", element_ids=""):
         client = _make_client(auth)
-        task_id = client.omni_image("kling-image-o1", normalize_prompts(prompt), [{"image": tensor_to_base64_string(image_1)}], aspect_ratio=aspect_ratio, resolution=resolution)
+        task_id = client.omni_image(model_name, normalize_prompts(prompt), [{"image": tensor_to_base64_string(image_1)}], elements=_element_list(element_ids), aspect_ratio=aspect_ratio, resolution=resolution)
         res = client.poll_task("/v1/images/omni-image", task_id)
         url = _extract_image_url(res)
         return (download_to_tensor(url), url, task_id)
@@ -1504,22 +1606,33 @@ class KlingDirect_ImageExtend(AlwaysExecuteMixin):
     def INPUT_TYPES(s):
         return {"required": {
             "auth": ("KLING_AUTH",),
-            "image_id": ("STRING", {"default": "", "forceInput": True, "tooltip": "Asset ID of the image to extend."}),
+            "image_id": ("STRING", {"default": "", "forceInput": True, "tooltip": "URL of the image to extend. Leave blank and connect `image` to extend an image tensor."}),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Prompt for the extended area."}),
-            "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1", "tooltip": "Target aspect ratio for the extended image."})
-        }, "optional": {"image": ("IMAGE",)}}
+            "aspect_ratio": (ASPECT_RATIOS, {"default": "1:1", "tooltip": "Target aspect ratio for the extended image (used when all four expansion ratios are 0). The image is padded evenly on both sides."})
+        }, "optional": {
+            "image": ("IMAGE",),
+            "up_expansion_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Expand upwards, as a multiple of the image height."}),
+            "down_expansion_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Expand downwards, as a multiple of the image height."}),
+            "left_expansion_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Expand leftwards, as a multiple of the image width."}),
+            "right_expansion_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Expand rightwards, as a multiple of the image width."}),
+        }}
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("image", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Image"
 
-    def generate(self, auth, image_id, prompt, aspect_ratio, image=None):
+    def generate(self, auth, image_id, prompt, aspect_ratio, image=None, up_expansion_ratio=0.0, down_expansion_ratio=0.0,
+                 left_expansion_ratio=0.0, right_expansion_ratio=0.0):
         client = _make_client(auth)
-        i_id = image_id
-        if not i_id and image is not None:
-            res = client.upload_asset(b64_data=tensor_to_base64_string(image), asset_type="image")
-            i_id = _extract_asset_id(res)
-        task_id = client.extend_image(i_id, normalize_prompts(prompt), aspect_ratio)
+        source = image_id.strip() or tensor_to_base64_string(image)
+        if not source:
+            raise ValueError("Kling Image Extend requires an image URL (image_id) or an image input.")
+        ratios = (up_expansion_ratio, down_expansion_ratio, left_expansion_ratio, right_expansion_ratio)
+        if not any(ratios):
+            if image is None:
+                raise ValueError("Kling Image Extend needs the `image` input (or explicit expansion ratios) to reach an aspect ratio.")
+            ratios = _expansion_ratios(image.shape[-2], image.shape[-3], aspect_ratio)
+        task_id = client.extend_image(source, *ratios, prompt=normalize_prompts(prompt))
         res = client.poll_task("/v1/images/editing/expand", task_id)
         url = _extract_image_url(res)
         return (download_to_tensor(url), url, task_id)
@@ -1533,7 +1646,7 @@ class KlingDirect_VirtualTryOn(AlwaysExecuteMixin):
             "auth": ("KLING_AUTH",),
             "human_image": ("IMAGE",),
             "cloth_image": ("IMAGE",),
-            "model_name": (["kolors-virtual-try-on-v1"], {"default": "kolors-virtual-try-on-v1", "tooltip": "Virtual try-on model."})
+            "model_name": (["kolors-virtual-try-on-v1", "kolors-virtual-try-on-v1-5"], {"default": "kolors-virtual-try-on-v1", "tooltip": "Virtual try-on model. v1-5 also accepts an upper + lower combination image."})
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("image", "url", "task_id")
@@ -1578,10 +1691,7 @@ class KlingDirect_MultiShot(AlwaysExecuteMixin):
         task_id = client.multi_shot_image("kling-image-o1", prompt, shots, aspect_ratio=aspect_ratio)
         res = client.poll_task("/v1/images/ai-multi-shot", task_id)
         url = _extract_image_url(res)
-        images = res.get("images", [])
-        if not images:
-            raise Exception("Kling multi-shot task completed but returned no images.")
-        imgs = [download_to_tensor(img["url"]) for img in images]
+        imgs = [download_to_tensor(img["url"]) for img in _task_images(res)]
         return (torch.cat(imgs, dim=0), url, task_id)
 
 
@@ -1596,7 +1706,7 @@ class KlingDirect_AudioGenerate(AlwaysExecuteMixin):
         return {"required": {
             "auth": ("KLING_AUTH",),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text description of the audio to generate."}),
-            "duration": ("INT", {"default": 5, "min": 1, "max": 30, "tooltip": "Audio duration in seconds."})
+            "duration": ("INT", {"default": 5, "min": 3, "max": 10, "tooltip": "Audio duration in seconds (Kling supports 3-10)."})
         }}
     RETURN_TYPES = ("AUDIO", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("audio", "audio_file", "url", "task_id")
@@ -1635,11 +1745,10 @@ class KlingDirect_TTS(AlwaysExecuteMixin):
 
     def generate(self, auth, text, voice_id, voice_speed=1.0, voice_language="en"):
         client = _make_client(auth)
-        task_id = client.tts(text, voice_id, voice_speed, voice_language)
-        res = client.poll_task("/v1/audio/tts", task_id)
+        res = client.tts(text, voice_id, voice_speed, voice_language)
         url = _extract_audio_url(res)
         path, name = download_to_output(url, ext="mp3")
-        return (load_audio_to_tensor(path), name, url, task_id)
+        return (load_audio_to_tensor(path), name, url, res.get("task_id", ""))
 
 
 class KlingDirect_VideoToAudio(AlwaysExecuteMixin):
@@ -1649,15 +1758,19 @@ class KlingDirect_VideoToAudio(AlwaysExecuteMixin):
         return {"required": {
             "auth": ("KLING_AUTH",),
             "video_url": ("STRING", {"default": "", "tooltip": "URL of the video to extract audio from."})
+        }, "optional": {
+            "sound_effect_prompt": ("STRING", {"default": "", "tooltip": "Describe the sound effects to generate (max 200 characters)."}),
+            "bgm_prompt": ("STRING", {"default": "", "tooltip": "Describe the background music to generate (max 200 characters)."}),
+            "asmr_mode": ("BOOLEAN", {"default": False, "tooltip": "Enhance fine-grained sound detail for immersive ASMR-style content."}),
         }}
     RETURN_TYPES = ("AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("audio", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Audio"
 
-    def generate(self, auth, video_url):
+    def generate(self, auth, video_url, sound_effect_prompt="", bgm_prompt="", asmr_mode=False):
         client = _make_client(auth)
-        task_id = client.video_to_audio(video_url)
+        task_id = client.video_to_audio(video_url, sound_effect_prompt or None, bgm_prompt or None, asmr_mode or None)
         res = client.poll_task("/v1/audio/video-to-audio", task_id)
         url = _extract_audio_url(res)
         return (download_audio_to_tensor(url), url, task_id)
@@ -1705,18 +1818,21 @@ class KlingDirect_MotionControl(AlwaysExecuteMixin):
             "image": ("IMAGE",),
             "video_url": ("STRING", {"default": "", "tooltip": "URL of the reference motion video."}),
             "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Optional text prompt to guide the motion-controlled generation."}),
-            "model_name": (VIDEO_MODELS_I2V, {"default": "kling-v1-6", "tooltip": "Kling model for motion control."}),
+            "model_name": (MOTION_CONTROL_MODELS, {"default": "kling-v2-6", "tooltip": "Kling model for motion control."}),
             "mode": (MODES, {"default": "pro", "tooltip": "Generation mode: 'pro' for higher quality, 'std' for faster."}),
             "character_orientation": (["image", "video"], {"default": "image", "tooltip": "Whether to use the character orientation from the image or the reference video."})
+        }, "optional": {
+            "keep_original_sound": (KEEP_SOUND_CHOICES, {"default": "default", "tooltip": "Keep the reference video's original audio. 'default' leaves it to Kling."}),
         }}
     RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
     FUNCTION = "generate"
     CATEGORY = "Kling AI/Video"
 
-    def generate(self, auth, image, video_url, prompt="", model_name="kling-v1-6", mode="pro", character_orientation="image"):
+    def generate(self, auth, image, video_url, prompt="", model_name="kling-v2-6", mode="pro", character_orientation="image", keep_original_sound="default"):
         client = _make_client(auth)
-        task_id = client.motion_control(model_name, tensor_to_base64_string(image), video_url, prompt=prompt, character_orientation=character_orientation, mode=mode)
+        task_id = client.motion_control(model_name, tensor_to_base64_string(image), video_url, prompt=prompt, character_orientation=character_orientation, mode=mode,
+                                        keep_original_sound=None if keep_original_sound == "default" else keep_original_sound)
         res = client.poll_task("/v1/videos/motion-control", task_id)
         url = _extract_video_url(res)
         path, name = download_to_output(url)
@@ -1728,26 +1844,30 @@ class KlingDirect_MotionControl(AlwaysExecuteMixin):
 # ============================================================
 
 class KlingDirect_VoiceClone(AlwaysExecuteMixin):
-    """Clone a voice from audio input. Returns a reusable voice_id for TTS."""
+    """Create a custom voice from an audio URL. Returns a reusable voice_id for TTS."""
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {"auth": ("KLING_AUTH",)},
                 "optional": {
-                    "audio": ("AUDIO",),
-                    "audio_url": ("STRING", {"default": "", "tooltip": "URL of an audio sample to clone the voice from."})
+                    "audio": ("AUDIO", {"tooltip": "Not supported: Kling needs a URL. Use audio_url (e.g. via Cloud Uploader)."}),
+                    "audio_url": ("STRING", {"default": "", "tooltip": "URL of a clean, single-speaker sample (.mp3/.wav/.mp4/.mov, 5-30 seconds)."}),
+                    "voice_name": ("STRING", {"default": "kling_voice", "tooltip": "Name for the new voice (max 20 characters)."}),
                 }}
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("voice_id",)
     FUNCTION = "clone"
     CATEGORY = "Kling AI/Audio"
 
-    def clone(self, auth, audio=None, audio_url=None):
+    def clone(self, auth, audio=None, audio_url=None, voice_name="kling_voice"):
         client = _make_client(auth)
-        a_url = audio_url if audio_url else None
-        a_b64 = audio_to_base64_string(audio) if audio is not None else None
-        if not a_url and not a_b64:
-            raise ValueError("Voice Clone requires either audio input or audio_url.")
-        voice_id = client.voice_clone(audio_url=a_url, audio_b64=a_b64)
+        if not audio_url or not audio_url.strip():
+            raise ValueError("Voice Clone requires audio_url: the Kling custom-voice API only accepts a URL, not raw audio.")
+        task_id = client.create_voice(voice_name, audio_url.strip())
+        res = client.poll_task("/v1/general/custom-voices", task_id)
+        voices = (res.get("task_result") or {}).get("voices")
+        if not voices:
+            raise Exception(f"Kling voice task completed but returned no voices. Response keys: {list(res.keys())}")
+        voice_id = voices[0]["voice_id"]
         print(f"[KLING] Voice cloned successfully! voice_id: {voice_id}")
         return (voice_id,)
 
@@ -1770,12 +1890,10 @@ class KlingDirect_TTSAdvanced(AlwaysExecuteMixin):
 
     def generate(self, auth, text, voice_id, voice_speed, voice_language="en"):
         client = _make_client(auth)
-        task_id = client.tts(text, voice_id, voice_speed, voice_language)
-        res = client.poll_task("/v1/audio/tts", task_id)
-        # K1: Fixed -- was calling _extract_video_url, now calls _extract_audio_url
+        res = client.tts(text, voice_id, voice_speed, voice_language)
         url = _extract_audio_url(res)
         path, name = download_to_output(url, ext="mp3")
-        return (load_audio_to_tensor(path), name, url, task_id)
+        return (load_audio_to_tensor(path), name, url, res.get("task_id", ""))
 
 
 class KlingDirect_VideoEffects(AlwaysExecuteMixin):
@@ -1785,10 +1903,10 @@ class KlingDirect_VideoEffects(AlwaysExecuteMixin):
         return {"required": {
             "auth": ("KLING_AUTH",),
             "image_1": ("IMAGE",),
-            "effect_scene": ("STRING", {"default": "hug", "tooltip": "Effect type (e.g., hug, kiss, heart). Use Effect Templates node to see available options."}),
-            "model_name": (["kling-v1", "kling-v1-5"], {"default": "kling-v1", "tooltip": "Model for video effects."}),
-            "duration": (["5", "10"], {"default": "5", "tooltip": "Effect video duration in seconds."}),
-            "mode": (MODES, {"default": "std", "tooltip": "Generation mode."})
+            "effect_scene": ("STRING", {"default": "hug_pro", "tooltip": "Effect to apply, e.g. hug_pro, kiss_pro (two images) or pet_dance (one image). The plain hug, kiss and fight effects were discontinued. See the Kling Video Effects Center for the full list."}),
+            "model_name": (["kling-v1", "kling-v1-5"], {"default": "kling-v1", "tooltip": "Not used: the Kling effects API no longer takes a model."}),
+            "duration": (["5", "10"], {"default": "5", "tooltip": "Not used: the Kling effects API no longer takes a duration."}),
+            "mode": (MODES, {"default": "std", "tooltip": "Not used: the Kling effects API no longer takes a mode."})
         }, "optional": {"image_2": ("IMAGE",)}}
     RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
@@ -1800,7 +1918,7 @@ class KlingDirect_VideoEffects(AlwaysExecuteMixin):
         images = [tensor_to_base64_string(image_1)]
         if image_2 is not None:
             images.append(tensor_to_base64_string(image_2))
-        task_id = client.video_effects(effect_scene, model_name, duration, images, mode)
+        task_id = client.video_effects(effect_scene, images)
         res = client.poll_task("/v1/videos/effects", task_id)
         url = _extract_video_url(res)
         path, name = download_to_output(url)
@@ -1827,7 +1945,7 @@ class KlingDirect_EffectTemplates(AlwaysExecuteMixin):
 
 
 class KlingDirect_ImageRecognize(AlwaysExecuteMixin):
-    """Recognize/describe image content using Kling's vision model."""
+    """Segment an image into subject, head, face and clothing regions with Kling's recognition API."""
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
@@ -1841,12 +1959,10 @@ class KlingDirect_ImageRecognize(AlwaysExecuteMixin):
 
     def recognize(self, auth, image):
         client = _make_client(auth)
-        task_id = client.image_recognize(tensor_to_base64_string(image))
-        res = client.poll_task("/v1/images/recognize", task_id)
-        task_result = res.get("task_result", {})
-        description = task_result.get("description", "") or task_result.get("text", "") or json.dumps(task_result)
+        res = client.image_recognize(tensor_to_base64_string(image))
+        description = json.dumps(res.get("task_result", {}), indent=2)
         print(f"[KLING] Image recognized: {description[:200]}...")
-        return (description, task_id)
+        return (description, res.get("task_id", ""))
 
 
 class KlingDirect_FastVideoSaver:
@@ -2152,8 +2268,8 @@ class KlingDirect_VideoToFile:
 
 
 class KlingDirect_ApiHealthCheck(AlwaysExecuteMixin):
-    """Verify auth + connectivity to Kling by fetching effect templates
-    (cheap / free call). Returns is_healthy + a status message."""
+    """Verify auth + connectivity to Kling by listing resource packages
+    (free call). Returns is_healthy + a status message."""
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {"auth": ("KLING_AUTH",)}}
@@ -2165,8 +2281,8 @@ class KlingDirect_ApiHealthCheck(AlwaysExecuteMixin):
     def check(self, auth):
         try:
             client = _make_client(auth)
-            client.effect_templates()
-            return (True, "Kling API: OK (auth + connectivity verified via /v1/videos/effect-templates).")
+            client.account_costs()
+            return (True, "Kling API: OK (auth + connectivity verified via /account/costs).")
         except KlingAPIError as e:
             return (False, f"Kling API ERROR: {e}")
         except Exception as e:
@@ -2190,6 +2306,186 @@ class KlingDirect_VoiceCatalog:
 
 
 # ============================================================
+# Kling 3.0 Turbo, elements, subject angles
+# ============================================================
+
+def _require_api_key(auth: dict):
+    if not auth.get("api_key"):
+        raise ValueError("Kling 3.0 Turbo needs a Kling API key. Set api_key on the Kling AI Authentication node.")
+
+
+class KlingDirect_TurboTextToVideo(AlwaysExecuteMixin):
+    """Generate video from text with Kling 3.0 Turbo (requires an API key)."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text description of the video. Multi-shot format: 'shot 1, 3, words; shot 2, 2, words;' (shot number, seconds, prompt)."}),
+            "resolution": (["720p", "1080p"], {"default": "720p", "tooltip": "Output resolution."}),
+            "aspect_ratio": (["16:9", "9:16", "1:1"], {"default": "16:9", "tooltip": "Output video aspect ratio."}),
+            "duration": ("INT", {"default": 5, "min": 3, "max": 15, "tooltip": "Video duration in seconds."}),
+        }}
+    RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
+    RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
+    FUNCTION = "generate"
+    CATEGORY = "Kling AI/Video"
+
+    def generate(self, auth, prompt, resolution, aspect_ratio, duration):
+        _require_api_key(auth)
+        client = _make_client(auth)
+        task_id = client.turbo_text_to_video(normalize_prompts(prompt), resolution, aspect_ratio, duration)
+        res = client.poll_task("/tasks", task_id)
+        url = _extract_video_url(res)
+        path, name = download_to_output(url)
+        return (load_video_to_tensor(path), name, load_audio_to_tensor(path), url, task_id)
+
+
+class KlingDirect_TurboImageToVideo(AlwaysExecuteMixin):
+    """Animate an image from its first frame with Kling 3.0 Turbo (requires an API key)."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "image": ("IMAGE",),
+            "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Optional text prompt to guide the video generation from the image."}),
+            "resolution": (["720p", "1080p"], {"default": "720p", "tooltip": "Output resolution."}),
+            "duration": ("INT", {"default": 5, "min": 3, "max": 15, "tooltip": "Video duration in seconds."}),
+        }}
+    RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
+    RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
+    FUNCTION = "generate"
+    CATEGORY = "Kling AI/Video"
+
+    def generate(self, auth, image, prompt, resolution, duration):
+        _require_api_key(auth)
+        client = _make_client(auth)
+        task_id = client.turbo_image_to_video(tensor_to_base64_string(image), normalize_prompts(prompt), resolution, duration)
+        res = client.poll_task("/tasks", task_id)
+        url = _extract_video_url(res)
+        path, name = download_to_output(url)
+        return (load_video_to_tensor(path), name, load_audio_to_tensor(path), url, task_id)
+
+
+class KlingDirect_CreateElement(AlwaysExecuteMixin):
+    """Create a reusable multi-image element (character, object, scene) in the Kling element library.
+    Returns the element_id to pass to Video Omni / Image Omni."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "element_name": ("STRING", {"default": "", "tooltip": "Element name (max 20 characters)."}),
+            "element_description": ("STRING", {"default": "", "multiline": True, "tooltip": "Element description (max 100 characters)."}),
+            "frontal_image": ("IMAGE", {"tooltip": "Frontal reference image of the element."}),
+            "refer_image_1": ("IMAGE", {"tooltip": "Reference image from another angle or a close-up."}),
+        }, "optional": {
+            "refer_image_2": ("IMAGE",),
+            "refer_image_3": ("IMAGE",),
+        }}
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("element_id", "task_id")
+    FUNCTION = "create"
+    CATEGORY = "Kling AI/Config"
+
+    def create(self, auth, element_name, element_description, frontal_image, refer_image_1, refer_image_2=None, refer_image_3=None):
+        client = _make_client(auth)
+        refers = [tensor_to_base64_string(i) for i in (refer_image_1, refer_image_2, refer_image_3) if i is not None]
+        task_id = client.create_element(element_name, element_description, tensor_to_base64_string(frontal_image), refers)
+        res = client.poll_task("/v1/general/advanced-custom-elements", task_id)
+        elements = (res.get("task_result") or {}).get("elements")
+        if not elements:
+            raise Exception(f"Kling element task completed but returned no elements. Response keys: {list(res.keys())}")
+        return (str(elements[0]["element_id"]), task_id)
+
+
+class KlingDirect_SubjectAngles(AlwaysExecuteMixin):
+    """Generate other-angle views of a subject from its frontal image (Kling AI Multi-Shot)."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "frontal_image": ("IMAGE", {"tooltip": "Frontal image of the subject."}),
+        }}
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING")
+    RETURN_NAMES = ("images", "url", "task_id")
+    FUNCTION = "generate"
+    CATEGORY = "Kling AI/Image"
+
+    def generate(self, auth, frontal_image):
+        client = _make_client(auth)
+        task_id = client.subject_completion(tensor_to_base64_string(frontal_image))
+        res = client.poll_task("/v1/general/ai-multi-shot", task_id)
+        urls = [img[key] for img in _task_images(res) for key in ("url_1", "url_2", "url_3") if img.get(key)]
+        if not urls:
+            raise Exception("Kling subject completion finished but returned no image URLs.")
+        return (torch.cat([download_to_tensor(u) for u in urls], dim=0), urls[0], task_id)
+
+
+class KlingDirect_MultiImageToVideo(AlwaysExecuteMixin):
+    """Generate video from up to 4 subject reference images with Kling v1.6."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text description of the video."}),
+            "image_1": ("IMAGE", {"tooltip": "Subject reference image. Crop to the subject first: Kling does not crop."}),
+            "negative_prompt": ("STRING", {"default": "", "tooltip": "Things to avoid in the generated video."}),
+            "mode": (MODES, {"default": "std", "tooltip": "Generation mode: 'pro' for higher quality, 'std' for faster/cheaper."}),
+            "duration": (["5", "10"], {"default": "5", "tooltip": "Video duration in seconds."}),
+            "aspect_ratio": (["16:9", "9:16", "1:1"], {"default": "16:9", "tooltip": "Output video aspect ratio."}),
+        }, "optional": {
+            "image_2": ("IMAGE",),
+            "image_3": ("IMAGE",),
+            "image_4": ("IMAGE",),
+        }}
+    RETURN_TYPES = ("IMAGE", "STRING", "AUDIO", "STRING", "STRING")
+    RETURN_NAMES = ("video", "video_file", "audio", "url", "task_id")
+    FUNCTION = "generate"
+    CATEGORY = "Kling AI/Video"
+
+    def generate(self, auth, prompt, image_1, negative_prompt, mode, duration, aspect_ratio, image_2=None, image_3=None, image_4=None):
+        client = _make_client(auth)
+        images = [tensor_to_base64_string(i) for i in (image_1, image_2, image_3, image_4) if i is not None]
+        task_id = client.multi_image_to_video(normalize_prompts(prompt), images, negative_prompt, mode, duration, aspect_ratio)
+        res = client.poll_task("/v1/videos/multi-image2video", task_id)
+        url = _extract_video_url(res)
+        path, name = download_to_output(url)
+        return (load_video_to_tensor(path), name, load_audio_to_tensor(path), url, task_id)
+
+
+class KlingDirect_ReferenceToImage(AlwaysExecuteMixin):
+    """Generate images from subject, scene and style reference images with Kling v2.1."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "auth": ("KLING_AUTH",),
+            "prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Text description of the image."}),
+            "subject_image_1": ("IMAGE", {"tooltip": "Subject reference image. Crop to the subject first: Kling does not crop."}),
+            "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "1:1", "tooltip": "Output image aspect ratio."}),
+            "n": ("INT", {"default": 1, "min": 1, "max": 9, "tooltip": "Number of images to generate (1-9)."}),
+        }, "optional": {
+            "subject_image_2": ("IMAGE",),
+            "subject_image_3": ("IMAGE",),
+            "subject_image_4": ("IMAGE",),
+            "scene_image": ("IMAGE", {"tooltip": "Scene reference image."}),
+            "style_image": ("IMAGE", {"tooltip": "Style reference image."}),
+        }}
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING")
+    RETURN_NAMES = ("image", "url", "task_id")
+    FUNCTION = "generate"
+    CATEGORY = "Kling AI/Image"
+
+    def generate(self, auth, prompt, subject_image_1, aspect_ratio, n, subject_image_2=None, subject_image_3=None,
+                 subject_image_4=None, scene_image=None, style_image=None):
+        client = _make_client(auth)
+        subjects = [tensor_to_base64_string(i) for i in (subject_image_1, subject_image_2, subject_image_3, subject_image_4) if i is not None]
+        task_id = client.reference_to_image(normalize_prompts(prompt), subjects, tensor_to_base64_string(scene_image),
+                                            tensor_to_base64_string(style_image), n, aspect_ratio)
+        res = client.poll_task("/v1/images/multi-image2image", task_id)
+        images = _task_images(res)
+        return (torch.cat([download_to_tensor(img["url"]) for img in images], dim=0), images[0].get("url", ""), task_id)
+
+
+# ============================================================
 # Registry
 # ============================================================
 
@@ -2203,6 +2499,9 @@ NODE_CLASS_MAPPINGS = {
     "KlingDirect_AdvancedLipSync": KlingDirect_AdvancedLipSync,
     "KlingDirect_MotionControl": KlingDirect_MotionControl,
     "KlingDirect_AvatarGen": KlingDirect_AvatarGen,
+    "KlingDirect_MultiImageToVideo": KlingDirect_MultiImageToVideo,
+    "KlingDirect_TurboTextToVideo": KlingDirect_TurboTextToVideo,
+    "KlingDirect_TurboImageToVideo": KlingDirect_TurboImageToVideo,
 
     # Image
     "KlingDirect_ImageGen": KlingDirect_ImageGen,
@@ -2211,6 +2510,8 @@ NODE_CLASS_MAPPINGS = {
     "KlingDirect_VirtualTryOn": KlingDirect_VirtualTryOn,
     "KlingDirect_MultiShot": KlingDirect_MultiShot,
     "KlingDirect_ImageRecognize": KlingDirect_ImageRecognize,
+    "KlingDirect_SubjectAngles": KlingDirect_SubjectAngles,
+    "KlingDirect_ReferenceToImage": KlingDirect_ReferenceToImage,
 
     # Audio
     "KlingDirect_AudioGenerate": KlingDirect_AudioGenerate,
@@ -2231,6 +2532,7 @@ NODE_CLASS_MAPPINGS = {
     "KlingDirect_RawFileSaver": KlingDirect_RawFileSaver,
     "KlingDirect_AssetUpload": KlingDirect_AssetUpload,
     "KlingDirect_ElementSelector": KlingDirect_ElementSelector,
+    "KlingDirect_CreateElement": KlingDirect_CreateElement,
     "KlingDirect_CameraControl": KlingDirect_CameraControl,
     "KlingDirect_VoiceSelector": KlingDirect_VoiceSelector,
     "KlingDirect_CloudUploader": KlingDirect_CloudUploader,
@@ -2259,6 +2561,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KlingDirect_AdvancedLipSync": "Kling Advanced Lip Sync",
     "KlingDirect_MotionControl": "Kling Motion Control",
     "KlingDirect_AvatarGen": "Kling Avatar Generation",
+    "KlingDirect_MultiImageToVideo": "Kling Multi-Image to Video",
+    "KlingDirect_TurboTextToVideo": "Kling 3.0 Turbo Text to Video",
+    "KlingDirect_TurboImageToVideo": "Kling 3.0 Turbo Image to Video",
 
     # Image
     "KlingDirect_ImageGen": "Kling Image Generation",
@@ -2267,6 +2572,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KlingDirect_VirtualTryOn": "Kling Virtual Try-On",
     "KlingDirect_MultiShot": "Kling AI Multi-Shot",
     "KlingDirect_ImageRecognize": "Kling Image Recognize",
+    "KlingDirect_SubjectAngles": "Kling Subject Angles",
+    "KlingDirect_ReferenceToImage": "Kling Reference to Image",
 
     # Audio
     "KlingDirect_AudioGenerate": "Kling Text to Audio",
@@ -2287,6 +2594,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KlingDirect_RawFileSaver": "Kling Raw File Saver",
     "KlingDirect_AssetUpload": "Kling AI Asset Upload",
     "KlingDirect_ElementSelector": "Kling AI Element",
+    "KlingDirect_CreateElement": "Kling Create Element",
     "KlingDirect_CameraControl": "Kling Camera Control",
     "KlingDirect_VoiceSelector": "Kling Voice Selector",
     "KlingDirect_CloudUploader": "Kling AI Cloud Uploader",

@@ -186,7 +186,7 @@ def test_download_to_output_retries_and_cleans_up(tmp_path):
 def test_camera_preset_outputs_klingcamera_dict():
     cam, = KlingDirect_CameraPreset().build("orbit_left", intensity=1.0)
     assert isinstance(cam, dict)
-    assert cam["type"] == "horizontal"
+    assert cam["type"] == "simple"
     assert cam["config"]["horizontal"] == -7.0
 
 
@@ -240,7 +240,7 @@ def test_voice_catalog_returns_valid_json():
 
 def test_region_selector_overrides_base_url():
     new_auth, = KlingDirect_RegionSelector().select({"access_key": "ak", "secret_key": "sk"}, "china")
-    assert new_auth["base_url"] == "https://api.klingai.com"
+    assert new_auth["base_url"] == "https://api-beijing.klingai.com"
 
 
 def test_region_selector_custom_url_wins():

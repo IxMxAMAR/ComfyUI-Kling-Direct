@@ -5,6 +5,88 @@ All notable changes to ComfyUI-Kling-Direct are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-10-02
+
+Brings the pack in line with the current Kling API reference: new models and
+parameters, a Kling 3.0 Turbo path, and corrected request/response handling for
+several nodes. Existing nodes keep their names, inputs and outputs; new inputs
+are appended at the end of each node.
+
+### Added
+
+- **API key authentication.** The Kling AI Authentication node has an optional
+  `api_key` input (or the `KLING_API_KEY` environment variable). When set it is
+  sent instead of the access/secret key JWT, and the access/secret keys become
+  optional.
+- **Kling 3.0 Turbo** nodes: `Kling 3.0 Turbo Text to Video` and
+  `Kling 3.0 Turbo Image to Video` (720p / 1080p, 3-15 s). Turbo uses the
+  unified `/tasks` API, which requires an API key. The Task Status node can query it
+  through the `/tasks` endpoint.
+- **Kling Create Element** - create a multi-image element and get its
+  `element_id`. Video Omni and Image Omni accept `element_ids` (comma separated).
+- **Kling Subject Angles** - other-angle views of a subject from its frontal image.
+- **Kling Multi-Image to Video** (kling-v1-6, up to 4 images) and
+  **Kling Reference to Image** (kling-v2-1, subject / scene / style references).
+- Text to Video, Image to Video and Video Omni: `4k` mode (kling-v3 / kling-v3-omni),
+  every duration from 3 to 15 s, and multi-shot storyboards through the new
+  `shot_list` input (one `seconds|prompt` shot per line). Text to Video `shot_type`
+  also accepts `intelligence`.
+- Video Omni: `sound`, `element_ids`, `video_refer_type` and `keep_original_sound`
+  inputs.
+- Image to Video / Keyframe Video: `kling-v2-5-turbo` model.
+- Motion Control: `keep_original_sound` input.
+- Image Generation: `kling-v2-1` model and the `21:9` aspect ratio.
+- Image Omni: `model_name` (`kling-image-o1` / `kling-v3-omni`), `4k` resolution and
+  `auto` / `21:9` aspect ratios.
+- Virtual Try-On: `kolors-virtual-try-on-v1-5` model.
+- Video to Audio: `sound_effect_prompt`, `bgm_prompt` and `asmr_mode` inputs.
+- Advanced Lip Sync: `sound_start_time`, `sound_end_time` and `sound_insert_time` inputs.
+- Image Extend: `up_expansion_ratio`, `down_expansion_ratio`,
+  `left_expansion_ratio` and `right_expansion_ratio` inputs.
+- Voice Clone: `voice_name` input.
+- Task Status: endpoints for custom voices, elements, subject angles, multi-image
+  video, reference-to-image and the unified `/tasks` API.
+
+### Changed
+
+- The `china` region now points to `https://api-beijing.klingai.com`.
+- Motion Control `model_name` offers `kling-v2-6` (new default) and `kling-v3`.
+- Video Effects default `effect_scene` is `hug_pro`: the plain `hug`, `kiss`,
+  `fight`, `thumbs_up`, `tiger_hug`, `pet_lion` and `3d_cartoon_1` effects were
+  discontinued. The effects API no longer takes a model, mode or duration, so those
+  inputs are ignored.
+- Audio Generation duration is limited to 3-10 s.
+- Error handling follows the current Kling error table: invalid-parameter errors
+  (1200-1203) fail immediately instead of being retried, and rate-limit,
+  concurrency and server errors (1302, 1303, 5000-5002) are retried with backoff.
+- API Health Check calls the free `/account/costs` endpoint.
+- Camera Control: axis types now send `simple` with a single non-zero axis, and the
+  predefined moves `down_back`, `forward_up`, `right_turn_forward` and
+  `left_turn_forward` were added. Camera Preset sends `simple` for every preset.
+
+### Fixed
+
+- Image nodes read results from `task_result.images`, and audio nodes from
+  `task_result.audios` (MP3 URL), so image and audio results are found.
+- Text to Speech is synchronous: the audio comes straight from the create response
+  instead of polling a task that does not exist.
+- Video Omni sends reference images as `image_url`, and forces `sound` off when a
+  reference video is used.
+- Motion Control sends the reference image as `image_url`.
+- Advanced Lip Sync sends the required sound times and a 0-2 volume (the volume
+  input is divided by 10 and capped at 2).
+- Avatar sends audio inline as `sound_file` instead of uploading it as a material.
+- Image Extend sends the image and four expansion ratios; `aspect_ratio` is
+  converted to ratios when none are set.
+- Image Recognize uses the synchronous `/v1/videos/image-recognize` endpoint and
+  returns the recognized regions as JSON.
+- Voice Clone uses the custom-voice API, which takes an audio URL.
+- Image Generation no longer sends the unsupported `fidelity` value.
+- Text to Video no longer sends `shot_type` values outside `customize` /
+  `intelligence`.
+- Video Effects sends only the images, as in the effects API reference.
+- Video Extend tooltip notes that only kling-v1 / v1-5 / v1-6 videos can be extended.
+
 ## [2.1.4] — 2026-05-17
 
 Republish to resolve registry/local version drift. Prior publish attempts

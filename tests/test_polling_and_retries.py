@@ -11,11 +11,15 @@ import pytest
 from kling_client import KlingClient, KlingAPIError, _PERMANENT_ERROR_CODES, _TRANSIENT_ERROR_CODES
 
 
-def test_1106_is_permanent_not_retried():
-    """REGRESSION: Code 1106 (Task Failed) used to be in _TRANSIENT_ERROR_CODES,
-    causing useless re-queries against a known-failed task."""
-    assert 1106 in _PERMANENT_ERROR_CODES
-    assert 1106 not in _TRANSIENT_ERROR_CODES
+def test_invalid_parameter_codes_are_permanent_not_retried():
+    """REGRESSION: 1200/1201 are invalid-parameter errors per the Kling error
+    table. They used to be retried as transient (with a 60s wait)."""
+    assert {1200, 1201, 1202, 1203} <= _PERMANENT_ERROR_CODES
+    assert not {1200, 1201} & _TRANSIENT_ERROR_CODES
+
+
+def test_rate_limit_concurrency_and_server_codes_are_transient():
+    assert {1302, 1303, 5000, 5001, 5002} <= _TRANSIENT_ERROR_CODES
 
 
 def test_poll_task_terminates_on_succeed():
