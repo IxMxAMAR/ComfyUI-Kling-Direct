@@ -230,9 +230,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        380
+        388
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -242,9 +242,9 @@
       "title": "Action",
       "bounding": [
         435,
-        -1,
+        -9,
         370,
-        382
+        390
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -254,9 +254,9 @@
       "title": "Output",
       "bounding": [
         835,
-        -1,
+        -9,
         370,
-        218
+        226
       ],
       "color": "#3F789E",
       "font_size": 24,

@@ -45,7 +45,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        246
+        290
       ],
       "size": [
         320,
@@ -557,9 +557,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        222
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -569,9 +569,9 @@
       "title": "Seed Image",
       "bounding": [
         35,
-        185,
+        221,
         370,
-        194
+        202
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -581,9 +581,9 @@
       "title": "Seed Video",
       "bounding": [
         435,
-        -1,
+        -9,
         370,
-        478
+        486
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -593,9 +593,9 @@
       "title": "Extend 1",
       "bounding": [
         835,
-        -1,
+        -9,
         370,
-        406
+        414
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -605,9 +605,9 @@
       "title": "Extend 2",
       "bounding": [
         1235,
-        -1,
+        -9,
         370,
-        406
+        414
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -617,9 +617,9 @@
       "title": "Extend 3",
       "bounding": [
         1635,
-        -1,
+        -9,
         370,
-        406
+        414
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -629,9 +629,9 @@
       "title": "Output",
       "bounding": [
         2035,
-        -1,
+        -9,
         370,
-        218
+        226
       ],
       "color": "#3F789E",
       "font_size": 24,

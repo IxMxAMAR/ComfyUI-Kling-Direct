@@ -43,7 +43,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        246
+        290
       ],
       "size": [
         320,
@@ -82,7 +82,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        404
+        448
       ],
       "size": [
         320,
@@ -204,7 +204,7 @@
       "type": "KlingDirect_AudioGenerate",
       "pos": [
         460,
-        478
+        522
       ],
       "size": [
         320,
@@ -313,7 +313,7 @@
       ],
       "size": [
         320,
-        56
+        136
       ],
       "flags": {},
       "order": 7,
@@ -388,9 +388,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        222
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -400,9 +400,9 @@
       "title": "Keyframes",
       "bounding": [
         35,
-        185,
+        221,
         370,
-        352
+        360
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -412,9 +412,9 @@
       "title": "Video",
       "bounding": [
         435,
-        -1,
+        -9,
         370,
-        454
+        462
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -424,9 +424,9 @@
       "title": "Music",
       "bounding": [
         435,
-        417,
+        453,
         370,
-        338
+        346
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -436,9 +436,9 @@
       "title": "Output",
       "bounding": [
         835,
-        -1,
+        -9,
         370,
-        324
+        412
       ],
       "color": "#3F789E",
       "font_size": 24,

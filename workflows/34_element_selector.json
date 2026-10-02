@@ -42,7 +42,7 @@
       "type": "KlingDirect_ElementSelector",
       "pos": [
         60,
-        246
+        290
       ],
       "size": [
         320,
@@ -216,9 +216,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        222
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -228,9 +228,9 @@
       "title": "Action",
       "bounding": [
         35,
-        185,
+        221,
         370,
-        198
+        206
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -240,9 +240,9 @@
       "title": "Generate",
       "bounding": [
         435,
-        -1,
+        -9,
         370,
-        526
+        534
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -252,9 +252,9 @@
       "title": "Output",
       "bounding": [
         835,
-        -1,
+        -9,
         370,
-        218
+        226
       ],
       "color": "#3F789E",
       "font_size": 24,

@@ -44,7 +44,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        246
+        290
       ],
       "size": [
         320,
@@ -85,7 +85,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        404
+        492
       ],
       "size": [
         320,
@@ -124,7 +124,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        562
+        650
       ],
       "size": [
         320,
@@ -163,7 +163,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        720
+        808
       ],
       "size": [
         320,
@@ -267,7 +267,7 @@
       ],
       "size": [
         320,
-        56
+        436
       ],
       "flags": {},
       "order": 7,
@@ -291,7 +291,7 @@
       "type": "KlingDirect_VirtualTryOn",
       "pos": [
         460,
-        238
+        684
       ],
       "size": [
         320,
@@ -352,11 +352,11 @@
       "type": "PreviewImage",
       "pos": [
         860,
-        166
+        992
       ],
       "size": [
         320,
-        56
+        436
       ],
       "flags": {},
       "order": 9,
@@ -380,7 +380,7 @@
       "type": "KlingDirect_VirtualTryOn",
       "pos": [
         460,
-        416
+        1616
       ],
       "size": [
         320,
@@ -441,11 +441,11 @@
       "type": "PreviewImage",
       "pos": [
         860,
-        272
+        2232
       ],
       "size": [
         320,
-        56
+        436
       ],
       "flags": {},
       "order": 11,
@@ -568,9 +568,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        222
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -580,9 +580,9 @@
       "title": "Person",
       "bounding": [
         35,
-        185,
+        221,
         370,
-        194
+        202
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -592,9 +592,9 @@
       "title": "Garments",
       "bounding": [
         35,
-        343,
+        423,
         370,
-        510
+        518
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -604,9 +604,9 @@
       "title": "Try-On 1",
       "bounding": [
         435,
-        -1,
+        -9,
         770,
-        214
+        530
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -616,9 +616,9 @@
       "title": "Try-On 2",
       "bounding": [
         435,
-        105,
+        615,
         770,
-        286
+        838
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -628,9 +628,9 @@
       "title": "Try-On 3",
       "bounding": [
         435,
-        211,
+        1547,
         770,
-        358
+        1146
       ],
       "color": "#3F789E",
       "font_size": 24,

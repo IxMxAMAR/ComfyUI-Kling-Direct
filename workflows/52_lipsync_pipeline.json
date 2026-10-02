@@ -135,7 +135,7 @@
       "type": "LoadAudio",
       "pos": [
         460,
-        238
+        452
       ],
       "size": [
         320,
@@ -168,7 +168,7 @@
       "type": "KlingDirect_CloudUploader",
       "pos": [
         860,
-        314
+        528
       ],
       "size": [
         320,
@@ -216,7 +216,7 @@
       "type": "KlingDirect_AdvancedLipSync",
       "pos": [
         1260,
-        60
+        230
       ],
       "size": [
         320,
@@ -298,7 +298,7 @@
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
         1660,
-        60
+        230
       ],
       "size": [
         320,
@@ -396,9 +396,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        222
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -408,9 +408,9 @@
       "title": "Video In",
       "bounding": [
         435,
-        -1,
+        -9,
         770,
-        290
+        298
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -420,9 +420,9 @@
       "title": "Audio In",
       "bounding": [
         435,
-        177,
+        383,
         770,
-        366
+        374
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -432,9 +432,9 @@
       "title": "Lipsync",
       "bounding": [
         1235,
-        -1,
+        161,
         370,
-        326
+        334
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -444,9 +444,9 @@
       "title": "Output",
       "bounding": [
         1635,
-        -1,
+        161,
         370,
-        218
+        226
       ],
       "color": "#3F789E",
       "font_size": 24,

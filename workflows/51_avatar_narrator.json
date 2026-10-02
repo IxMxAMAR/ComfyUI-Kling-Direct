@@ -43,7 +43,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        246
+        290
       ],
       "size": [
         320,
@@ -307,9 +307,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        222
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -319,9 +319,9 @@
       "title": "Portrait",
       "bounding": [
         35,
-        185,
+        221,
         370,
-        194
+        202
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -331,9 +331,9 @@
       "title": "TTS",
       "bounding": [
         435,
-        -1,
+        -9,
         370,
-        386
+        394
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -343,9 +343,9 @@
       "title": "Avatar",
       "bounding": [
         835,
-        -1,
+        -9,
         370,
-        382
+        390
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -355,9 +355,9 @@
       "title": "Output",
       "bounding": [
         1235,
-        -1,
+        -9,
         370,
-        218
+        226
       ],
       "color": "#3F789E",
       "font_size": 24,

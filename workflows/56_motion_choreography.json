@@ -43,7 +43,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        246
+        290
       ],
       "size": [
         320,
@@ -117,7 +117,7 @@
       "type": "KlingDirect_CameraPreset",
       "pos": [
         460,
-        222
+        266
       ],
       "size": [
         320,
@@ -282,7 +282,7 @@
       "type": "KlingDirect_ImageToVideo",
       "pos": [
         860,
-        502
+        900
       ],
       "size": [
         320,
@@ -366,7 +366,7 @@
       "type": "KlingDirect_FastVideoSaver",
       "pos": [
         1260,
-        242
+        640
       ],
       "size": [
         320,
@@ -480,9 +480,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        222
+        230
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -492,9 +492,9 @@
       "title": "Source",
       "bounding": [
         35,
-        185,
+        221,
         370,
-        194
+        202
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -504,9 +504,9 @@
       "title": "Camera A",
       "bounding": [
         435,
-        -1,
+        -9,
         370,
-        198
+        206
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -516,9 +516,9 @@
       "title": "Camera B",
       "bounding": [
         435,
-        161,
+        197,
         370,
-        198
+        206
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -528,9 +528,9 @@
       "title": "Video A",
       "bounding": [
         835,
-        -1,
+        -9,
         770,
-        478
+        486
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -540,9 +540,9 @@
       "title": "Video B",
       "bounding": [
         835,
-        181,
+        571,
         770,
-        738
+        746
       ],
       "color": "#3F789E",
       "font_size": 24,

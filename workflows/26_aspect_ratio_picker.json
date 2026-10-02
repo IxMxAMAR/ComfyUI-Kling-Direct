@@ -201,7 +201,7 @@
       ],
       "size": [
         320,
-        56
+        436
       ],
       "flags": {},
       "order": 5,
@@ -268,9 +268,9 @@
       "title": "Setup",
       "bounding": [
         35,
-        -1,
+        -9,
         370,
-        506
+        514
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -280,9 +280,9 @@
       "title": "Action",
       "bounding": [
         435,
-        -1,
+        -9,
         370,
-        438
+        446
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -292,9 +292,9 @@
       "title": "Output",
       "bounding": [
         835,
-        -1,
+        -9,
         370,
-        142
+        530
       ],
       "color": "#3F789E",
       "font_size": 24,
