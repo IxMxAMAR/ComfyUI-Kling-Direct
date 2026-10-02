@@ -538,15 +538,23 @@ def test_avatar_node_sends_audio_inline_without_materials_upload(client, no_vide
     client.upload_asset.assert_not_called()
 
 
-def test_advanced_lip_sync_node_measures_audio_and_uses_face_start(client, no_video_io):
+def test_advanced_lip_sync_node_measures_audio_and_uses_face_start(client, no_video_io, tmp_path):
     client.identify_face.return_value = {"session_id": "s", "face_data": [{"face_id": "f", "start_time": 1500, "end_time": 9000}]}
     client.advanced_lip_sync.return_value = "t"
     client.poll_task.return_value = VIDEO_RES
     clip = {"waveform": torch.zeros((1, 1, 16000 * 5)), "sample_rate": 16000}
-    with patch.object(kn, "download_audio_to_tensor", return_value=clip):
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"")
+
+    def fake_download(url, ext="mp4", **kwargs):
+        return (str(audio), "a.mp3") if ext == "mp3" else ("/tmp/v.mp4", "v.mp4")
+
+    with patch.object(kn, "download_to_output", side_effect=fake_download), \
+         patch.object(kn, "load_audio_to_tensor", return_value=clip):
         kn.KlingDirect_AdvancedLipSync().generate(AUTH, "https://v/x.mp4", "https://a/x.mp3", volume=10)
     args, kwargs = client.advanced_lip_sync.call_args
     assert args[3:6] == (0, 5000, 1500) and kwargs["volume"] == 1.0
+    assert not audio.exists()
 
 
 def test_advanced_lip_sync_node_uses_explicit_times_and_caps_volume(client, no_video_io):
@@ -559,11 +567,15 @@ def test_advanced_lip_sync_node_uses_explicit_times_and_caps_volume(client, no_v
     assert args[3:6] == (200, 4000, 300) and kwargs["volume"] == 2.0
 
 
-def test_advanced_lip_sync_node_rejects_unmeasurable_audio(client):
+def test_advanced_lip_sync_node_rejects_unmeasurable_audio(client, tmp_path):
     client.identify_face.return_value = {"session_id": "s", "face_data": [{"face_id": "f"}]}
-    with patch.object(kn, "download_audio_to_tensor", return_value=kn._empty_audio()):
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"")
+    with patch.object(kn, "download_to_output", return_value=(str(audio), "a.mp3")), \
+         patch.object(kn, "load_audio_to_tensor", return_value=kn._empty_audio()):
         with pytest.raises(ValueError, match="sound_end_time"):
             kn.KlingDirect_AdvancedLipSync().generate(AUTH, "https://v/x.mp4", "https://a/x.mp3")
+    assert not audio.exists()
 
 
 def test_image_gen_node_downloads_every_image(client):

@@ -1524,7 +1524,11 @@ class KlingDirect_AdvancedLipSync(AlwaysExecuteMixin):
         print(f"[KLING] Selected face ID: {face_id} from {len(faces)} detected face(s).")
 
         if not sound_end_time:
-            clip = download_audio_to_tensor(audio_url)
+            path, _ = download_to_output(audio_url, ext="mp3")
+            try:
+                clip = load_audio_to_tensor(path)
+            finally:
+                os.remove(path)
             sound_end_time = int(clip["waveform"].shape[-1] / clip["sample_rate"] * 1000)
             if sound_end_time < 2000:
                 raise ValueError("Kling Advanced Lip Sync could not measure the audio length. Set sound_end_time (ms).")
