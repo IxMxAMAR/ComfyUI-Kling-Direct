@@ -40,14 +40,14 @@
     },
     {
       "id": 2,
-      "type": "KlingDirect_TextToVideo",
+      "type": "KlingDirect_TurboTextToVideo",
       "pos": [
         460,
         60
       ],
       "size": [
         320,
-        544
+        320
       ],
       "flags": {},
       "order": 2,
@@ -57,11 +57,6 @@
           "name": "auth",
           "type": "KLING_AUTH",
           "link": 1
-        },
-        {
-          "name": "camera_control",
-          "type": "KLING_CAMERA",
-          "link": null
         }
       ],
       "outputs": [
@@ -99,20 +94,14 @@
         }
       ],
       "properties": {
-        "recipe_id": "t2v",
-        "Node name for S&R": "KlingDirect_TextToVideo"
+        "recipe_id": "turbo",
+        "Node name for S&R": "KlingDirect_TurboTextToVideo"
       },
       "widgets_values": [
-        "A serene cinematic shot of a mountain valley at sunrise, golden hour light, misty peaks",
-        "blurry, low quality",
-        "kling-v3",
+        "a red fox walking through fresh snow, golden hour",
+        "720p",
         "16:9",
-        "5",
-        "pro",
-        true,
-        0.5,
-        "wide_angle",
-        ""
+        5
       ]
     },
     {
@@ -159,7 +148,7 @@
       },
       "widgets_values": [
         "",
-        "kling_t2v"
+        "kling_turbo_t2v"
       ]
     }
   ],
@@ -200,7 +189,7 @@
         435,
         -9,
         370,
-        638
+        414
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -228,8 +217,8 @@
         0
       ]
     },
-    "description": "Minimum viable text-to-video: add your API keys, type a prompt, and get a video.",
-    "title": "Kling \u2014 Quickstart: Text to Video",
+    "description": "Generate a short clip from a text prompt with the Turbo text-to-video node and save it to disk. Set an API key on the Auth node (or the KLING_API_KEY environment variable).",
+    "title": "Kling \u2014 Turbo Text to Video",
     "tier": 1,
     "pack": "ComfyUI-Kling-Direct"
   },

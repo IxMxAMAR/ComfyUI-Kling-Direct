@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        136
+        160
       ],
       "flags": {},
       "order": 1,
@@ -34,7 +34,8 @@
       "widgets_values": [
         "",
         "",
-        false
+        false,
+        ""
       ]
     },
     {
@@ -46,7 +47,7 @@
       ],
       "size": [
         320,
-        240
+        312
       ],
       "flags": {},
       "order": 2,
@@ -100,7 +101,10 @@
         "https://example.com/talking_head.mp4",
         "https://example.com/speech.mp3",
         0,
-        80
+        80,
+        0,
+        0,
+        0
       ]
     },
     {
@@ -176,7 +180,7 @@
         35,
         -9,
         370,
-        230
+        254
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -188,7 +192,7 @@
         435,
         -9,
         370,
-        334
+        406
       ],
       "color": "#3F789E",
       "font_size": 24,

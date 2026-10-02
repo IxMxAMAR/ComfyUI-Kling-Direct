@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        136
+        160
       ],
       "flags": {},
       "order": 1,
@@ -34,7 +34,8 @@
       "widgets_values": [
         "",
         "",
-        false
+        false,
+        ""
       ]
     },
     {
@@ -42,7 +43,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        246
+        270
       ],
       "size": [
         320,
@@ -85,7 +86,7 @@
       ],
       "size": [
         320,
-        344
+        368
       ],
       "flags": {},
       "order": 3,
@@ -143,9 +144,10 @@
       "widgets_values": [
         "https://example.com/walking_reference.mp4",
         "A character walking left with a natural stride",
-        "kling-v1-6",
+        "kling-v2-6",
         "pro",
-        "image"
+        "image",
+        "default"
       ]
     },
     {
@@ -229,7 +231,7 @@
         35,
         -9,
         370,
-        388
+        412
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -241,7 +243,7 @@
         435,
         -9,
         370,
-        438
+        462
       ],
       "color": "#3F789E",
       "font_size": 24,

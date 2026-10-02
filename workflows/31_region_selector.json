@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        136
+        160
       ],
       "flags": {},
       "order": 1,
@@ -34,7 +34,8 @@
       "widgets_values": [
         "",
         "",
-        false
+        false,
+        ""
       ]
     },
     {
@@ -42,7 +43,7 @@
       "type": "KlingDirect_RegionSelector",
       "pos": [
         60,
-        246
+        270
       ],
       "size": [
         320,
@@ -86,7 +87,7 @@
       ],
       "size": [
         320,
-        440
+        544
       ],
       "flags": {},
       "order": 3,
@@ -150,7 +151,8 @@
         "std",
         true,
         0.5,
-        "wide_angle"
+        "wide_angle",
+        ""
       ]
     },
     {
@@ -234,7 +236,7 @@
         35,
         -9,
         370,
-        392
+        416
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -246,7 +248,7 @@
         435,
         -9,
         370,
-        534
+        638
       ],
       "color": "#3F789E",
       "font_size": 24,

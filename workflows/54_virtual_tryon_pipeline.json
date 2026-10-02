@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        136
+        160
       ],
       "flags": {},
       "order": 1,
@@ -36,7 +36,8 @@
       "widgets_values": [
         "",
         "",
-        false
+        false,
+        ""
       ]
     },
     {
@@ -44,7 +45,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        290
+        314
       ],
       "size": [
         320,
@@ -85,7 +86,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        492
+        516
       ],
       "size": [
         320,
@@ -124,7 +125,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        650
+        674
       ],
       "size": [
         320,
@@ -163,7 +164,7 @@
       "type": "LoadImage",
       "pos": [
         60,
-        808
+        832
       ],
       "size": [
         320,
@@ -255,7 +256,7 @@
         "Node name for S&R": "KlingDirect_VirtualTryOn"
       },
       "widgets_values": [
-        "kolors-virtual-try-on-v1"
+        "kolors-virtual-try-on-v1-5"
       ]
     },
     {
@@ -344,7 +345,7 @@
         "Node name for S&R": "KlingDirect_VirtualTryOn"
       },
       "widgets_values": [
-        "kolors-virtual-try-on-v1"
+        "kolors-virtual-try-on-v1-5"
       ]
     },
     {
@@ -433,7 +434,7 @@
         "Node name for S&R": "KlingDirect_VirtualTryOn"
       },
       "widgets_values": [
-        "kolors-virtual-try-on-v1"
+        "kolors-virtual-try-on-v1-5"
       ]
     },
     {
@@ -570,7 +571,7 @@
         35,
         -9,
         370,
-        230
+        254
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -580,7 +581,7 @@
       "title": "Person",
       "bounding": [
         35,
-        221,
+        245,
         370,
         202
       ],
@@ -592,7 +593,7 @@
       "title": "Garments",
       "bounding": [
         35,
-        423,
+        447,
         370,
         518
       ],

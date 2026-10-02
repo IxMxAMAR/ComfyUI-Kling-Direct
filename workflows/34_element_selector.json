@@ -11,7 +11,7 @@
       ],
       "size": [
         320,
-        136
+        160
       ],
       "flags": {},
       "order": 1,
@@ -34,7 +34,8 @@
       "widgets_values": [
         "",
         "",
-        false
+        false,
+        ""
       ]
     },
     {
@@ -42,7 +43,7 @@
       "type": "KlingDirect_ElementSelector",
       "pos": [
         60,
-        290
+        314
       ],
       "size": [
         320,
@@ -78,7 +79,7 @@
       ],
       "size": [
         320,
-        440
+        544
       ],
       "flags": {},
       "order": 3,
@@ -142,7 +143,8 @@
         "pro",
         true,
         0.5,
-        "natural"
+        "natural",
+        ""
       ]
     },
     {
@@ -218,7 +220,7 @@
         35,
         -9,
         370,
-        230
+        254
       ],
       "color": "#3F789E",
       "font_size": 24,
@@ -228,7 +230,7 @@
       "title": "Action",
       "bounding": [
         35,
-        221,
+        245,
         370,
         206
       ],
@@ -242,7 +244,7 @@
         435,
         -9,
         370,
-        534
+        638
       ],
       "color": "#3F789E",
       "font_size": 24,
